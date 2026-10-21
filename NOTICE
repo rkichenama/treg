@@ -1,0 +1,5 @@
+treg is a TypeScript/Node port inspired by ffpb.
+
+ffpb — https://github.com/althonos/ffpb
+MIT License
+Copyright (c) 2017-2021 Martin Larralde <martin.larralde@ens-paris-saclay.fr>
