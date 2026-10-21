@@ -1,5 +1,8 @@
 * text=auto eol=lf
 
+# Captured ffmpeg output: keep exact bytes (\r, CRLF) for parser tests
+test/fixtures/** -text
+
 *.png binary
 *.jpg binary
 *.mp4 binary

@@ -1,0 +1,16 @@
+{
+  "args": [
+    "-hide_banner",
+    "-loglevel",
+    "level+info",
+    "-y",
+    "-i",
+    "input.mp4",
+    "-f",
+    "null",
+    "-"
+  ],
+  "stdin": null,
+  "exitCode": 0,
+  "ffmpegVersion": "ffmpeg version 2023-06-11-git-09621fd7d9-full_build-www.gyan.dev Copyright (c) 2000-2023 the FFmpeg developers"
+}

@@ -1,0 +1,38 @@
+[info] Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'input.mp4':
+[info]   Metadata:
+[info]     major_brand     : isom
+[info]     minor_version   : 512
+[info]     compatible_brands: isomiso2mp41
+[info]     encoder         : Lavf60.6.100
+[info]   Duration: 00:00:05.00, start: 0.000000, bitrate: 408 kb/s
+[info]   Stream #0:0[0x1](und): Video: mpeg4 (Simple Profile) (mp4v / 0x7634706D), yuv420p, 320x240 [SAR 1:1 DAR 4:3], 330 kb/s, 25 fps, 25 tbr, 12800 tbn (default)
+[info]     Metadata:
+[info]       handler_name    : VideoHandler
+[info]       vendor_id       : [0][0][0][0]
+[info]       encoder         : Lavc60.17.100 mpeg4
+[info]   Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono, fltp, 69 kb/s (default)
+[info]     Metadata:
+[info]       handler_name    : SoundHandler
+[info]       vendor_id       : [0][0][0][0]
+[info] Stream mapping:
+[info]   Stream #0:0 -> #0:0 (mpeg4 (native) -> wrapped_avframe (native))
+[info]   Stream #0:1 -> #0:1 (aac (native) -> pcm_s16le (native))
+[info] Press [q] to stop, [?] for help
+[info] Output #0, null, to 'pipe:':
+[info]   Metadata:
+[info]     major_brand     : isom
+[info]     minor_version   : 512
+[info]     compatible_brands: isomiso2mp41
+[info]     encoder         : Lavf60.6.100
+[info]   Stream #0:0(und): Video: wrapped_avframe, yuv420p(progressive), 320x240 [SAR 1:1 DAR 4:3], q=2-31, 200 kb/s, 25 fps, 25 tbn (default)
+[info]     Metadata:
+[info]       handler_name    : VideoHandler
+[info]       vendor_id       : [0][0][0][0]
+[info]       encoder         : Lavc60.17.100 wrapped_avframe
+[info]   Stream #0:1(und): Audio: pcm_s16le, 44100 Hz, mono, s16, 705 kb/s (default)
+[info]     Metadata:
+[info]       handler_name    : SoundHandler
+[info]       vendor_id       : [0][0][0][0]
+[info]       encoder         : Lavc60.17.100 pcm_s16le
+[info] frame=    0 fps=0.0 q=-0.0 size=N/A time=00:00:00.46 bitrate=N/A speed=82.1x    [out#0/null @ 000001a892f6b680] [info] video:59kB audio:432kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: unknown
+[info] frame=  125 fps=0.0 q=-0.0 Lsize=N/A time=00:00:04.99 bitrate=N/A speed= 293x    

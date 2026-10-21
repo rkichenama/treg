@@ -1,0 +1,2 @@
+[error] Unrecognized option 'nosuchoption'.
+[fatal] Error splitting the argument list: Option not found

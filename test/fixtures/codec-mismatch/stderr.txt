@@ -1,0 +1,26 @@
+[info] Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'input.mp4':
+[info]   Metadata:
+[info]     major_brand     : isom
+[info]     minor_version   : 512
+[info]     compatible_brands: isomiso2mp41
+[info]     encoder         : Lavf60.6.100
+[info]   Duration: 00:00:05.00, start: 0.000000, bitrate: 408 kb/s
+[info]   Stream #0:0[0x1](und): Video: mpeg4 (Simple Profile) (mp4v / 0x7634706D), yuv420p, 320x240 [SAR 1:1 DAR 4:3], 330 kb/s, 25 fps, 25 tbr, 12800 tbn (default)
+[info]     Metadata:
+[info]       handler_name    : VideoHandler
+[info]       vendor_id       : [0][0][0][0]
+[info]       encoder         : Lavc60.17.100 mpeg4
+[info]   Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono, fltp, 69 kb/s (default)
+[info]     Metadata:
+[info]       handler_name    : SoundHandler
+[info]       vendor_id       : [0][0][0][0]
+[info] Stream mapping:
+[info]   Stream #0:0 -> #0:0 (mpeg4 (native) -> mjpeg (native))
+[info]   Stream #0:1 -> #0:1 (aac (native) -> opus (libopus))
+[info] Press [q] to stop, [?] for help
+[libopus @ 000002243e9d2200] [warning] No bit rate set. Defaulting to 64000 bps.
+[swscaler @ 000002243f4af540] [warning] deprecated pixel format used, make sure you did set range correctly
+[webm @ 000002243e9c4640] [error] Only VP8 or VP9 or AV1 video and Vorbis or Opus audio and WebVTT subtitles are supported for WebM.
+[out#0/webm @ 000002243e9acd80] [error] Could not write header (incorrect codec parameters ?): Invalid argument
+[libopus @ 000002243e9d2200] [warning] 1 frames left in the queue on closing
+[info] Conversion failed!
