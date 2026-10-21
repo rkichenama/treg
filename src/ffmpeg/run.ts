@@ -7,7 +7,7 @@ import { TregError } from '../errors.js';
 import { ProgressParser } from '../parse/progress.js';
 import { StderrParser, type StderrEvent } from '../parse/stderr.js';
 import { LogCollector } from '../report/collect.js';
-import { buildFailureReport, type FailureReport } from '../report/failure.js';
+import { buildFailureReport, effectiveExitCode, type FailureReport } from '../report/failure.js';
 import type { HeaderInfo, LogEntry, ProgressUpdate } from '../types.js';
 import {
   analyzeArgs,
@@ -59,8 +59,13 @@ export interface ProgressSnapshot extends ProgressUpdate {
 }
 
 export interface RunResult {
-  /** ffmpeg's exit code (255 when it died from a signal). */
+  /**
+   * ffmpeg's exit code (255 when it died from a signal), except 1 when ffmpeg
+   * exited 0 after a fatal error (see effectiveExitCode).
+   */
   exitCode: number;
+  /** ffmpeg's actual exit code. */
+  ffmpegExitCode: number;
   signal?: NodeJS.Signals;
   /** Stopped by cancel() or Ctrl+C. */
   cancelled: boolean;
@@ -225,7 +230,8 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
     sendHeader();
     if (logStream && !logStream.closed) await once(logStream, 'close');
 
-    const exitCode = code ?? (signal ? 255 : 1);
+    const ffmpegExitCode = code ?? (signal ? 255 : 1);
+    const exitCode = effectiveExitCode(ffmpegExitCode, collector);
     const failed = exitCode !== 0 && !this.cancelled;
     let keptLog = logPath;
     if (logPath && opts.logFile === 'auto' && !failed) {
@@ -235,6 +241,7 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
 
     const result: RunResult = {
       exitCode,
+      ffmpegExitCode,
       cancelled: this.cancelled,
       elapsedSec: elapsed(),
       header: stderr.header.info,
@@ -247,6 +254,7 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
     if (failed) {
       result.failure = buildFailureReport({
         exitCode,
+        ffmpegExitCode,
         collector,
         header: stderr.header.info,
         errorsSuppressed: built.errorsSuppressed,

@@ -3,7 +3,10 @@ import type { Issue, LogCollector } from './collect.js';
 
 /** What treg shows when ffmpeg exits with an error. */
 export interface FailureReport {
+  /** Exit code treg reports (see effectiveExitCode). */
   exitCode: number;
+  /** ffmpeg's actual exit code; differs from exitCode only when ffmpeg exited 0. */
+  ffmpegExitCode: number;
   /** ffmpeg's own error/fatal messages, in order, deduplicated. */
   errors: Issue[];
   warnings: Issue[];
@@ -16,8 +19,18 @@ export interface FailureReport {
   logFile?: string;
 }
 
+/**
+ * ffmpeg 6.1 to 9.0 exit with 0 after some fatal errors, e.g. when refusing
+ * to overwrite an existing output (`-n`, or answering no to the prompt).
+ * A successful run never logs at fatal level, so report those as exit 1.
+ */
+export function effectiveExitCode(ffmpegExitCode: number, collector: LogCollector): number {
+  return ffmpegExitCode === 0 && collector.hasFatal() ? 1 : ffmpegExitCode;
+}
+
 export function buildFailureReport(input: {
   exitCode: number;
+  ffmpegExitCode?: number;
   collector: LogCollector;
   header: HeaderInfo;
   errorsSuppressed: boolean;
@@ -26,6 +39,7 @@ export function buildFailureReport(input: {
   const { collector } = input;
   const report: FailureReport = {
     exitCode: input.exitCode,
+    ffmpegExitCode: input.ffmpegExitCode ?? input.exitCode,
     errors: collector.errors.map((e) => ({ ...e })),
     warnings: collector.warnings.map((w) => ({ ...w })),
     mapping: [...input.header.mapping],

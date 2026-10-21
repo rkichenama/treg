@@ -56,6 +56,11 @@ export class LogCollector {
     return issue;
   }
 
+  /** True when ffmpeg logged a fatal or panic message, i.e. it gave up. */
+  hasFatal(): boolean {
+    return this.errors.some((e) => e.level === 'fatal' || e.level === 'panic');
+  }
+
   /** Last non-empty raw stderr lines, for when ffmpeg tagged no errors. */
   recentLines(limit = 10): string[] {
     return this.recent.slice(-limit);

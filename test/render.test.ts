@@ -45,6 +45,7 @@ const snap = (
 
 const result = (extra: Partial<RunResult> = {}): RunResult => ({
   exitCode: 0,
+  ffmpegExitCode: 0,
   cancelled: false,
   elapsedSec: 5,
   header: { inputs: [], outputs: [], mapping: [] },
@@ -161,6 +162,7 @@ describe('renderers', () => {
         exitCode: 1,
         failure: {
           exitCode: 1,
+          ffmpegExitCode: 1,
           errors: [{ level: 'error', component: 'webm', message: 'Only VP8 or VP9', count: 1 }],
           warnings: [],
           mapping: [],

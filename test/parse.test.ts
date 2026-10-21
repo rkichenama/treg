@@ -167,6 +167,22 @@ describe('StderrParser', () => {
     ]);
   });
 
+  it('waits for the prompt trailing space before taking it', () => {
+    const parser = new StderrParser();
+    expect(parser.push("File 'o.mp4' already exists. Overwrite? [y/N]")).toEqual([]);
+    const events = [...parser.push(' '), ...parser.push('[fatal] Not overwriting - exiting\n')];
+    expect(events.map((e) => e.type)).toEqual(['prompt', 'log']);
+    expect(events[1]).toMatchObject({
+      entry: { level: 'fatal', message: 'Not overwriting - exiting' },
+    });
+  });
+
+  it('still parses a tagged line that starts with stray whitespace', () => {
+    const parser = new StderrParser();
+    const [event] = parser.push(' [fatal] Not overwriting - exiting\n');
+    expect(event).toMatchObject({ type: 'log', entry: { level: 'fatal' } });
+  });
+
   it('keeps untagged lines standalone when nothing was tagged', () => {
     const { events } = parseAll('Unrecognized option foo\nError splitting the argument list\n');
     const logs = events.filter((e) => e.type === 'log');

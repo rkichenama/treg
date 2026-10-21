@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { StderrParser } from '../src/parse/stderr.js';
 import { LogCollector } from '../src/report/collect.js';
-import { buildFailureReport } from '../src/report/failure.js';
+import { buildFailureReport, effectiveExitCode } from '../src/report/failure.js';
 import { formatFailure } from '../src/report/format.js';
 import { createStyle } from '../src/render/style.js';
 import { FAILURE_FIXTURES, loadFixture } from './helpers.js';
@@ -45,6 +45,36 @@ describe('failure report from real ffmpeg output', () => {
     expect(text).not.toContain('Duration:');
     expect(text).not.toContain('Input #0');
     expect(text.split('\n').length).toBeLessThan(12);
+  });
+
+  it('treats exit 0 with a fatal error as failure (ffmpeg 6.1-9.0 overwrite refusal)', () => {
+    const collector = new LogCollector();
+    const parser = new StderrParser();
+    const { stderr } = loadFixture('exists-no-overwrite');
+    for (const e of [...parser.push(stderr), ...parser.flush()]) {
+      if (e.type === 'log') collector.add(e.entry);
+    }
+    expect(effectiveExitCode(0, collector)).toBe(1);
+    const report = buildFailureReport({
+      exitCode: 1,
+      ffmpegExitCode: 0,
+      collector,
+      header: parser.header.info,
+      errorsSuppressed: false,
+    });
+    const text = formatFailure(report, createStyle(false)).join('\n');
+    expect(text).toContain('✖ ffmpeg failed (exit 1)');
+    expect(text).toContain('ffmpeg exited 0 despite this fatal error');
+  });
+
+  it('keeps exit 0 when ffmpeg only logged non-fatal errors', () => {
+    const collector = new LogCollector();
+    const parser = new StderrParser();
+    for (const e of parser.push('[h264 @ 0x1] [error] concealing 12 DC errors\n')) {
+      if (e.type === 'log') collector.add(e.entry);
+    }
+    expect(effectiveExitCode(0, collector)).toBe(0);
+    expect(effectiveExitCode(255, collector)).toBe(255);
   });
 
   it('codec mismatch includes the stream mapping', () => {

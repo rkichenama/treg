@@ -10,6 +10,8 @@ export type StderrEvent =
 
 // ffmpeg prints this without a newline and then waits on stdin.
 const PROMPT = /^File '(.*)' already exists\. Overwrite\? \[y\/N\] ?/;
+// While pending, wait for the trailing space so it doesn't start the next line.
+const PENDING_PROMPT = /^File '(.*)' already exists\. Overwrite\? \[y\/N\] $/;
 
 /**
  * Turns ffmpeg stderr chunks into log entries, overwrite prompts and legacy
@@ -26,8 +28,8 @@ export class StderrParser {
     for (const line of this.lines.push(chunk)) this.line(line, events);
     // The prompt has no trailing newline; detect it while it is still pending.
     const pending = this.lines.pending;
-    const m = PROMPT.exec(pending);
-    if (m && m[0].length === pending.length) {
+    const m = PENDING_PROMPT.exec(pending);
+    if (m) {
       this.lines.takePending();
       events.push({ type: 'prompt', file: m[1] ?? '', text: pending });
     }

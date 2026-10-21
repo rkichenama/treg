@@ -3,7 +3,7 @@ import { parseClock } from './time.js';
 
 // `[component @ 0x...] [level] message`, component optional.
 const TAGGED =
-  /^(?:\[(?<component>[^\]]+?)(?: @ (?:0x)?[0-9a-fA-F]+)?\] )?\[(?<level>panic|fatal|error|warning|info|verbose|debug|trace)\] (?<message>.*)$/;
+  /^\s*(?:\[(?<component>[^\]]+?)(?: @ (?:0x)?[0-9a-fA-F]+)?\] )?\[(?<level>panic|fatal|error|warning|info|verbose|debug|trace)\] (?<message>.*)$/;
 
 /** Splits a stderr line produced with `-loglevel level+...` into its parts. */
 export function parseLogLine(raw: string): LogEntry {

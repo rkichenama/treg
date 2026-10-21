@@ -29,6 +29,13 @@ function issueLines(issues: Issue[], style: Style, color: (s: string) => string)
 /** Turns a failure report into the lines treg prints. */
 export function formatFailure(report: FailureReport, style: Style): string[] {
   const lines = [style.red(style.bold(`✖ ffmpeg failed (exit ${report.exitCode})`))];
+  if (report.ffmpegExitCode !== report.exitCode) {
+    lines.push(
+      style.dim(
+        `  ffmpeg exited ${report.ffmpegExitCode} despite this fatal error; treg reports failure.`,
+      ),
+    );
+  }
 
   if (report.errors.length > 0) {
     lines.push(...issueLines(report.errors, style, (s) => s));
