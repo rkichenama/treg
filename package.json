@@ -29,7 +29,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "fixtures": "tsx scripts/capture-fixtures.ts"
+    "fixtures": "tsx scripts/capture-fixtures.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
   },
   "keywords": [
     "ffmpeg",
