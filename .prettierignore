@@ -1,4 +1,4 @@
 dist/
-coverage/
+@coverage/
 pnpm-lock.yaml
 test/fixtures/

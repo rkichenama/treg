@@ -6,7 +6,7 @@ import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  { ignores: ['dist/', 'coverage/', 'test/fixtures/'] },
+  { ignores: ['dist/', '@coverage/', 'test/fixtures/'] },
   {
     files: ['**/*.{js,mjs,ts}'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
