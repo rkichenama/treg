@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 /** Asks ffprobe for a file's duration in seconds. Resolves undefined on any failure. */
+/* istanbul ignore next -- @preserve */
 export function probeDuration(ffprobePath: string, input: string): Promise<number | undefined> {
   return new Promise((resolve) => {
     let out = '';

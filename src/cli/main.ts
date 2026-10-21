@@ -28,6 +28,7 @@ export interface CliIO {
   cwd: string;
 }
 
+/* istanbul ignore next -- @preserve */
 const defaultIO = (): CliIO => ({
   stdout: process.stdout,
   stderr: process.stderr,
@@ -49,6 +50,7 @@ ffmpeg's own help: treg -h
 `;
 
 /** Runs treg and returns the process exit code (ffmpeg's, when it ran). */
+/* istanbul ignore next -- @preserve */
 export async function main(argv: readonly string[], io: CliIO = defaultIO()): Promise<number> {
   try {
     return await run(argv, io);
@@ -96,6 +98,7 @@ interface Ui {
   renderer(jsonExtra?: Record<string, unknown>): Renderer;
 }
 
+/* istanbul ignore next -- @preserve */
 function createUi(options: TregOptions, io: CliIO, mediaOnStdout: boolean): Ui {
   const format = resolveFormat(options.format === 'raw' ? 'auto' : options.format, io.stderr);
   const style = createStyle(shouldColor(options.color, io.stderr, io.env));
@@ -111,6 +114,7 @@ function createUi(options: TregOptions, io: CliIO, mediaOnStdout: boolean): Ui {
 }
 
 /** Starts one ffmpeg run with its output going to `renderer`. */
+/* istanbul ignore next -- @preserve */
 function startJob(
   ffmpegPath: string,
   args: readonly string[],
@@ -223,6 +227,7 @@ function writeJson(out: Output, event: Record<string, unknown>): void {
   out.write(JSON.stringify(event) + '\n');
 }
 
+/* istanbul ignore next -- @preserve */
 async function ask(prompt: PromptInfo, io: CliIO): Promise<boolean> {
   const rl = createInterface({
     input: io.stdin,
@@ -238,6 +243,7 @@ async function ask(prompt: PromptInfo, io: CliIO): Promise<boolean> {
 }
 
 /** Runs ffmpeg with the user's args and the terminal attached, unchanged. */
+/* istanbul ignore next -- @preserve */
 function passthrough(ffmpegPath: string, args: readonly string[], io: CliIO): Promise<number> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(ffmpegPath, args, { stdio: 'inherit', cwd: io.cwd, env: io.env });

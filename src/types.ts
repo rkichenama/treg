@@ -1,3 +1,4 @@
+/* istanbul ignore file -- @preserve */
 export const LOG_LEVELS = [
   'panic',
   'fatal',

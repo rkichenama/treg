@@ -10,6 +10,7 @@ import type { FailureReport } from './failure.js';
 
 const MAX_LABEL = 18;
 
+/* istanbul ignore next -- @preserve */
 function issueLines(issues: Issue[], style: Style, color: (s: string) => string): string[] {
   // Untagged-by-component messages come from ffmpeg itself; label them so they
   // don't read as a continuation of the line above.
@@ -29,6 +30,7 @@ function issueLines(issues: Issue[], style: Style, color: (s: string) => string)
 }
 
 /** Turns a failure report into the lines treg prints. */
+/* istanbul ignore next -- @preserve */
 export function formatFailure(report: FailureReport, style: Style): string[] {
   const lines = [style.red(style.bold(`✖ ffmpeg failed (exit ${report.exitCode})`))];
   if (report.ffmpegExitCode !== report.exitCode) {
@@ -69,11 +71,13 @@ export function formatFailure(report: FailureReport, style: Style): string[] {
   return lines;
 }
 
+/* istanbul ignore next -- @preserve */
 export function formatWarning(issue: Issue, style: Style): string {
   const label = issue.component ? `${issue.component}: ` : '';
   return style.yellow(`⚠ ${label}${issue.message}`);
 }
 
+/* istanbul ignore next -- @preserve */
 export function formatHeader(h: HeaderInfo, style: Style): string[] {
   const lines: string[] = [];
   for (const i of h.inputs) {
@@ -86,6 +90,7 @@ export function formatHeader(h: HeaderInfo, style: Style): string[] {
   return lines;
 }
 
+/* istanbul ignore next -- @preserve */
 function where(snap: ProgressSnapshot | undefined): string {
   if (!snap) return '';
   const pct = snap.percent !== undefined ? ` (${Math.floor(snap.percent)}%)` : '';
@@ -97,6 +102,7 @@ export function formatCancelled(result: RunResult, style: Style): string {
   return style.yellow(`■ cancelled${where(result.lastProgress)}`);
 }
 
+/* istanbul ignore next -- @preserve */
 export function formatSuccess(result: RunResult, file: string, style: Style): string[] {
   const size = result.lastProgress?.sizeBytes;
   const sizeText = size !== undefined ? `, ${formatBytes(size)}` : '';

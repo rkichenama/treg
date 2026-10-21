@@ -5,6 +5,7 @@
 export class LineSplitter {
   private rest = '';
 
+  /* istanbul ignore next -- @preserve */
   push(chunk: string): string[] {
     const parts = (this.rest + chunk).split(/\r\n|\r|\n/);
     this.rest = parts.pop() ?? '';

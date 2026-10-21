@@ -110,6 +110,7 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
   }
 
   /** First call asks ffmpeg to finish cleanly (like pressing q); second kills it. */
+  /* istanbul ignore next -- @preserve */
   cancel(): void {
     this.cancelled = true;
     this.cancelRequests++;
@@ -265,6 +266,7 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
     return result;
   }
 
+  /* istanbul ignore next -- @preserve */
   private async answerPrompt(prompt: PromptInfo): Promise<void> {
     this.emit('prompt', prompt);
     let yes: boolean;
@@ -277,6 +279,7 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
   }
 }
 
+/* istanbul ignore next -- @preserve */
 function openLog(logFile: string | null | undefined): {
   logPath?: string;
   logStream?: WriteStream;

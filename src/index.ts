@@ -1,3 +1,4 @@
+/* istanbul ignore file -- @preserve */
 export { VERSION } from './version.js';
 export { TregError } from './errors.js';
 

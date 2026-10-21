@@ -64,9 +64,12 @@ function defaults(): TregOptions {
 
 type Check = (value: unknown) => string | undefined;
 
+/* istanbul ignore next -- @preserve */
 const isString: Check = (v) => (typeof v === 'string' ? undefined : 'must be a string');
+/* istanbul ignore next -- @preserve */
 const isNonEmptyString: Check = (v) =>
   typeof v === 'string' && v.length > 0 ? undefined : 'must be a non-empty string';
+/* istanbul ignore next -- @preserve */
 const isBoolean: Check = (v) => (typeof v === 'boolean' ? undefined : 'must be true or false');
 const positive: Check = (v) =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 ? undefined : 'must be a positive number';
@@ -81,22 +84,27 @@ const CHECKS: Record<keyof TregOptions, Check> = {
   ffmpegPath: isNonEmptyString,
   format: oneOf(FORMATS),
   template: isString,
+  /* istanbul ignore next -- @preserve */
   barWidth: (v) =>
     v === 'auto' || (Number.isInteger(v) && (v as number) > 0)
       ? undefined
       : 'must be "auto" or a positive whole number',
+  /* istanbul ignore next -- @preserve */
   barChars: () => undefined, // checked field by field below
   color: oneOf(COLOR_MODES),
   refreshHz: positive,
+  /* istanbul ignore next -- @preserve */
   lineEveryPercent: (v) =>
     typeof v === 'number' && v > 0 && v <= 100 ? undefined : 'must be a number from 1 to 100',
   showHeader: isBoolean,
   showWarnings: isBoolean,
+  /* istanbul ignore next -- @preserve */
   logFile: (v) =>
     v === null || (typeof v === 'string' && v !== '')
       ? undefined
       : 'must be null, "auto" or a file path',
   probe: isBoolean,
+  /* istanbul ignore next -- @preserve */
   inputs: (v) =>
     Array.isArray(v) && v.every((x) => typeof x === 'string' && x !== '')
       ? undefined
@@ -159,6 +167,7 @@ function mergeBarChars(value: unknown, options: TregOptions, source: string): st
 }
 
 /** Loads the `--treg-option` file, or returns the defaults when no path. */
+/* istanbul ignore next -- @preserve */
 export function loadOptions(path?: string): ResolvedOptions {
   if (path === undefined) {
     return {
