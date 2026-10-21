@@ -23,7 +23,8 @@ describe('time', () => {
   });
 
   it('formats clocks', () => {
-    expect(formatClock(5)).toBe('0:05');
+    expect(formatClock(5)).toBe('00:05');
+    expect(formatClock(605)).toBe('10:05');
     expect(formatClock(3723.9)).toBe('1:02:03');
     expect(formatClock(undefined)).toBe('--:--');
   });

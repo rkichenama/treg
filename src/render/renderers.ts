@@ -140,7 +140,8 @@ export class BarRenderer extends TextRenderer {
     const { options, out, style } = this.ctx;
     const line = layoutLine({
       template: options.template,
-      values: tokenValues(snap, style.bold(this.file)),
+      values: tokenValues(snap, this.file),
+      fileStyle: style.bold,
       columns: out.columns ?? 80,
       barWidth: options.barWidth,
       chars: options.barChars,

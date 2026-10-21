@@ -97,20 +97,53 @@ export interface LineLayout {
   chars: BarChars;
   fraction: number | undefined;
   tick: number;
+  /** Applied to `{file}` after it is fitted; `values.file` must be plain text. */
+  fileStyle?: (s: string) => string;
 }
 
 const MIN_AUTO_BAR = 10;
 
-/** Renders the template to fit `columns` without wrapping. */
+/**
+ * Fits `s` to exactly `width` characters: pads it when short, otherwise
+ * replaces the middle with `…` so both ends stay visible.
+ */
+export function fitMiddle(s: string, width: number): string {
+  const chars = [...s];
+  if (width <= 0) return '';
+  if (chars.length <= width) return s + ' '.repeat(width - chars.length);
+  if (width === 1) return '…';
+  const head = Math.floor((width - 1) / 2);
+  const tail = width - 1 - head;
+  return chars.slice(0, head).join('') + '…' + chars.slice(chars.length - tail).join('');
+}
+
+/**
+ * Renders the template to fill `columns` without wrapping. An `auto` bar takes
+ * the space the full file name leaves; `{file}` gets the rest, padded or
+ * middle-truncated to fit.
+ */
 export function layoutLine(l: LineLayout): string {
-  const withoutBar = renderTemplate(l.template, { ...l.values, bar: '' });
+  const file = l.values.file ?? '';
+  const fileSlots = l.template.split('{file}').length - 1;
+  const hasBar = l.template.includes('{bar}');
+  const fixed = visibleLength(renderTemplate(l.template, { ...l.values, bar: '', file: '' }));
+  const free = l.columns - 1 - fixed;
   let width: number;
-  if (l.barWidth === 'auto') {
-    const free = l.columns - 1 - visibleLength(withoutBar);
-    width = free >= MIN_AUTO_BAR ? free : l.template.includes('{bar}') ? MIN_AUTO_BAR : 0;
+  if (!hasBar) {
+    width = 0;
+  } else if (l.barWidth === 'auto') {
+    width = Math.max(MIN_AUTO_BAR, free - visibleLength(file) * fileSlots);
   } else {
     width = l.barWidth;
   }
   const bar = renderBar(l.fraction, width, l.chars, l.tick);
-  return truncateVisible(renderTemplate(l.template, { ...l.values, bar }), l.columns - 1);
+  let fitted = file;
+  if (fileSlots > 0) {
+    fitted = fitMiddle(file, Math.floor(Math.max(0, free - width) / fileSlots));
+    if (l.fileStyle) fitted = l.fileStyle(fitted);
+  }
+  return truncateVisible(
+    renderTemplate(l.template, { ...l.values, bar, file: fitted }),
+    l.columns - 1,
+  );
 }

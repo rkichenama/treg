@@ -4,7 +4,7 @@
 
 ```
 $ treg -i input.mov -c:v libx264 output.mp4
-output.mp4 ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱  71% | 0:42/0:59 | 3.20x | ETA 0:05
+output.mp4 ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱  71% | 00:42/00:59 | 3.20x | ETA 00:05
 ```
 
 ```
@@ -136,7 +136,7 @@ set to its default.
 | `ffmpegPath`       | `"ffmpeg"`                                                           | Command on `PATH` or path to the ffmpeg executable                                               |
 | `format`           | `"auto"`                                                             | `auto`, `bar`, `line`, `json`, `quiet` or `raw`. `auto` is `bar` on a terminal, `line` otherwise |
 | `template`         | `"{file} {bar} {percent} \| {time}/{total} \| {speed} \| ETA {eta}"` | Progress line for `bar`. See tokens below                                                        |
-| `barWidth`         | `"auto"`                                                             | Bar width in characters, or `auto` to fill the terminal                                          |
+| `barWidth`         | `"auto"`                                                             | Bar width, or `auto` to fill the terminal. `{file}` gets the rest, cut in the middle if long     |
 | `barChars`         | `{ "complete": "▰", "incomplete": "▱" }`                             | One character each                                                                               |
 | `color`            | `"auto"`                                                             | `auto` (terminal only, respects `NO_COLOR`), `always` or `never`                                 |
 | `refreshHz`        | `10`                                                                 | Bar redraws or JSON progress events per second                                                   |
@@ -152,9 +152,9 @@ set to its default.
 | Token       | Example  | Token       | Example         |
 | ----------- | -------- | ----------- | --------------- |
 | `{bar}`     | `▰▰▰▰▱▱` | `{speed}`   | `3.20x`         |
-| `{percent}` | ` 71%`   | `{eta}`     | `0:05`          |
-| `{time}`    | `0:42`   | `{elapsed}` | `0:13`          |
-| `{total}`   | `0:59`   | `{size}`    | `12.4 MiB`      |
+| `{percent}` | ` 71%`   | `{eta}`     | `00:05`         |
+| `{time}`    | `00:42`  | `{elapsed}` | `00:13`         |
+| `{total}`   | `00:59`  | `{size}`    | `12.4 MiB`      |
 | `{frame}`   | `1050`   | `{bitrate}` | `2400.0 kbit/s` |
 | `{fps}`     | `79.5`   | `{file}`    | `output.mp4`    |
 
@@ -193,13 +193,13 @@ treg --treg-option batch.json -c:v libx264 -crf 20 "out/{name}.mp4"
 
 ```
 [1/3] clips/a.mov → out/a.mp4
-out/a.mp4 ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰ 100% | 0:12/0:12 | 3.10x | ETA 0:00
-✔ done in 0:04 → a.mp4, 3.1 MiB
+out/a.mp4 ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰ 100% | 00:12/00:12 | 3.10x | ETA 00:00
+✔ done in 00:04 → a.mp4, 3.1 MiB
 [2/3] clips/b.mov → out/b.mp4
 ✖ ffmpeg failed (exit 1)
   ...
 [3/3] clips/c.mov → out/c.mp4
-✔ done in 0:06 → c.mp4, 4.4 MiB
+✔ done in 00:06 → c.mp4, 4.4 MiB
 batch: 3 files, 2 done, 1 failed
   ✖ clips/b.mov: in#0: Error opening input: Invalid data found when processing input
 ```

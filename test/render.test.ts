@@ -5,6 +5,7 @@ import type { ProgressSnapshot, RunResult, StartInfo } from '../src/ffmpeg/run.j
 import { createRenderer, resolveFormat } from '../src/render/index.js';
 import { createStyle, shouldColor, truncateVisible, visibleLength } from '../src/render/style.js';
 import {
+  fitMiddle,
   formatBytes,
   layoutLine,
   renderBar,
@@ -99,6 +100,63 @@ describe('template', () => {
     expect(visibleLength(narrow)).toBeLessThanOrEqual(19);
   });
 
+  it('fits file names by padding or cutting the middle', () => {
+    expect(fitMiddle('a.mp4', 8)).toBe('a.mp4   ');
+    expect(fitMiddle('abcdefghij.mp4', 9)).toBe('abcd….mp4');
+    expect(fitMiddle('abcdef', 1)).toBe('…');
+    expect(fitMiddle('abcdef', 0)).toBe('');
+  });
+
+  it('gives the file the space a fixed bar leaves', () => {
+    const base = {
+      template: '{file} {bar} {percent}',
+      columns: 30,
+      barWidth: 10,
+      chars: { complete: '#', incomplete: '.' },
+      fraction: 0.5,
+      tick: 0,
+    };
+    const short = layoutLine({ ...base, values: { file: 'x.mp4', percent: ' 50%' } });
+    expect(short).toBe('x.mp4         #####.....  50%');
+    expect(visibleLength(short)).toBe(29);
+    const long = layoutLine({
+      ...base,
+      values: { file: 'a-very-long-file-name.mp4', percent: ' 50%' },
+    });
+    expect(long).toBe('a-very…me.mp4 #####.....  50%');
+    expect(visibleLength(long)).toBe(29);
+  });
+
+  it('keeps the full name with an auto bar and truncates only when the bar is at minimum', () => {
+    const base = {
+      template: '{file} {bar} {percent}',
+      barWidth: 'auto' as const,
+      chars: { complete: '#', incomplete: '.' },
+      fraction: 0.5,
+      tick: 0,
+    };
+    const name = 'a-very-long-file-name.mp4';
+    const wide = layoutLine({ ...base, columns: 60, values: { file: name, percent: ' 50%' } });
+    expect(wide.startsWith(`${name} #`)).toBe(true);
+    expect(visibleLength(wide)).toBe(59);
+    const narrow = layoutLine({ ...base, columns: 30, values: { file: name, percent: ' 50%' } });
+    expect(narrow).toBe('a-very…me.mp4 #####.....  50%');
+  });
+
+  it('styles the fitted file name', () => {
+    const line = layoutLine({
+      template: '{file}|',
+      values: { file: 'abcdefghij' },
+      columns: 8,
+      barWidth: 'auto',
+      chars: { complete: '#', incomplete: '.' },
+      fraction: undefined,
+      tick: 0,
+      fileStyle: (s) => s.toUpperCase(),
+    });
+    expect(line).toBe('AB…HIJ|');
+  });
+
   it('formats bytes', () => {
     expect(formatBytes(512)).toBe('512 B');
     expect(formatBytes(1536 * 1024)).toBe('1.5 MiB');
@@ -151,7 +209,7 @@ describe('renderers', () => {
     expect(out.text).toContain('\r\x1b[2K');
     expect(out.text).toContain('b.mkv');
     expect(out.text).toContain('100%');
-    expect(out.text).toMatch(/✔ done in 0:04 → b\.mkv\n$/);
+    expect(out.text).toMatch(/✔ done in 00:04 → b\.mkv\n$/);
   });
 
   it('bar prints the failure report instead of a summary', () => {
@@ -208,7 +266,7 @@ describe('renderers', () => {
     );
     renderer.start({ ...start, analysis: analyzeArgs(['-i', 'in/a.mp4', '-f', 'mp4', '-']) });
     renderer.end(result());
-    expect(out.text).toContain('✔ done in 0:05 → stdout');
+    expect(out.text).toContain('✔ done in 00:05 → stdout');
   });
 
   it('quiet prints only failures and cancels', () => {
@@ -218,7 +276,7 @@ describe('renderers', () => {
     expect(ok.out.text).toBe('');
     const cancel = setup('quiet');
     cancel.renderer.end(result({ cancelled: true, lastProgress: snap(20) }));
-    expect(cancel.out.text).toContain('■ cancelled at 0:02 / 0:10 (20%)');
+    expect(cancel.out.text).toContain('■ cancelled at 00:02 / 00:10 (20%)');
   });
 
   it('json writes one event per line to its own output', () => {
