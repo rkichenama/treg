@@ -31,7 +31,17 @@ export { parseClock, parseFfmpegDuration, formatClock } from './parse/time.js';
 
 export { LogCollector, type Issue } from './report/collect.js';
 export { buildFailureReport, type FailureReport } from './report/failure.js';
-export { formatFailure } from './report/format.js';
+export { formatFailure, formatBatchSummary, formatJobLabel } from './report/format.js';
+
+export { expandInputs } from './batch/inputs.js';
+export { planBatch, fillOutputTemplate, OUTPUT_TOKENS, type BatchJob } from './batch/plan.js';
+export {
+  summarizeBatch,
+  batchExitCode,
+  type BatchSummary,
+  type BatchJobResult,
+  type BatchStatus,
+} from './batch/summary.js';
 
 export {
   createRenderer,

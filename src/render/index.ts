@@ -17,11 +17,15 @@ export function resolveFormat(format: Exclude<Format, 'raw'>, out: Output): Rend
   return out.isTTY ? 'bar' : 'line';
 }
 
-/** `json` writes events to `jsonOut`; the others write to `ctx.out`. */
+/**
+ * `json` writes events to `jsonOut`, each with `jsonExtra` added; the others
+ * write to `ctx.out`.
+ */
 export function createRenderer(
   format: RenderFormat,
   ctx: RenderContext,
   jsonOut: Output,
+  jsonExtra?: Record<string, unknown>,
 ): Renderer {
   switch (format) {
     case 'bar':
@@ -31,7 +35,7 @@ export function createRenderer(
     case 'quiet':
       return new QuietRenderer(ctx);
     case 'json':
-      return new JsonRenderer(ctx, jsonOut);
+      return new JsonRenderer(ctx, jsonOut, jsonExtra);
   }
 }
 

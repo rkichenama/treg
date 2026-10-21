@@ -1,15 +1,24 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { expandInputs } from '../batch/inputs.js';
+import { fillOutputTemplate, planBatch, type BatchJob } from '../batch/plan.js';
+import { batchExitCode, summarizeBatch } from '../batch/summary.js';
 import { TregError } from '../errors.js';
 import { analyzeArgs } from '../ffmpeg/analyze.js';
 import { locateFfmpeg } from '../ffmpeg/locate.js';
-import { runFfmpeg, type PromptInfo } from '../ffmpeg/run.js';
-import { createRenderer, resolveFormat } from '../render/index.js';
-import { createStyle, shouldColor, type Output } from '../render/style.js';
+import { runFfmpeg, type FfmpegRun, type PromptInfo, type RunResult } from '../ffmpeg/run.js';
+import { formatBatchSummary, formatJobLabel } from '../report/format.js';
+import {
+  createRenderer,
+  resolveFormat,
+  type RenderFormat,
+  type Renderer,
+} from '../render/index.js';
+import { createStyle, shouldColor, type Output, type Style } from '../render/style.js';
 import { VERSION } from '../version.js';
 import { OPTION_FLAG, rejoinColonSplits, splitArgs } from './args.js';
-import { loadOptions } from './options.js';
+import { loadOptions, type TregOptions } from './options.js';
 
 export interface CliIO {
   stdout: Output;
@@ -66,28 +75,56 @@ async function run(argv: readonly string[], io: CliIO): Promise<number> {
   const ffmpegPath = locateFfmpeg(options.ffmpegPath, { env: io.env, cwd: io.cwd });
   const analysis = analyzeArgs(ffmpegArgs);
 
+  if (analysis.infoQuery) return passthrough(ffmpegPath, ffmpegArgs, io);
+  if (options.inputs.length > 0) return runBatch(ffmpegPath, ffmpegArgs, options, io);
+
   // Nothing to show progress for: hand the terminal to ffmpeg.
-  if (options.format === 'raw' || analysis.infoQuery || analysis.outputs.length === 0) {
+  if (options.format === 'raw' || analysis.outputs.length === 0) {
     return passthrough(ffmpegPath, ffmpegArgs, io);
   }
 
-  const format = resolveFormat(options.format, io.stderr);
+  const ui = createUi(options, io, analysis.outputToStdout);
+  const job = startJob(ffmpegPath, ffmpegArgs, options.logFile, options, io, ui.renderer());
+  const result = await withSigint(() => job.cancel(), job.done);
+  return result.exitCode;
+}
 
+interface Ui {
+  format: RenderFormat;
+  style: Style;
+  jsonOut: Output;
+  renderer(jsonExtra?: Record<string, unknown>): Renderer;
+}
+
+function createUi(options: TregOptions, io: CliIO, mediaOnStdout: boolean): Ui {
+  const format = resolveFormat(options.format === 'raw' ? 'auto' : options.format, io.stderr);
   const style = createStyle(shouldColor(options.color, io.stderr, io.env));
   // JSON goes to stdout unless ffmpeg is writing media there.
-  const jsonOut = analysis.outputToStdout ? io.stderr : io.stdout;
-  const renderer = createRenderer(format, { options, out: io.stderr, style }, jsonOut);
-  const interactive = Boolean(io.stdin.isTTY) && !analysis.inputFromStdin;
+  const jsonOut = mediaOnStdout ? io.stderr : io.stdout;
+  return {
+    format,
+    style,
+    jsonOut,
+    renderer: (jsonExtra) =>
+      createRenderer(format, { options, out: io.stderr, style }, jsonOut, jsonExtra),
+  };
+}
 
+/** Starts one ffmpeg run with its output going to `renderer`. */
+function startJob(
+  ffmpegPath: string,
+  args: readonly string[],
+  logFile: string | null,
+  options: TregOptions,
+  io: CliIO,
+  renderer: Renderer,
+): FfmpegRun {
   const job = runFfmpeg({
     ffmpegPath,
-    args: ffmpegArgs,
-    interactive,
+    args,
+    interactive: Boolean(io.stdin.isTTY) && !analyzeArgs(args).inputFromStdin,
     onPrompt: (p) => ask(p, io),
-    logFile:
-      options.logFile && options.logFile !== 'auto'
-        ? resolve(io.cwd, options.logFile)
-        : options.logFile,
+    logFile: logFile && logFile !== 'auto' ? resolve(io.cwd, logFile) : logFile,
     probe: options.probe,
     cwd: io.cwd,
     env: io.env,
@@ -98,16 +135,92 @@ async function run(argv: readonly string[], io: CliIO): Promise<number> {
   job.on('log', (l) => renderer.log(l));
   job.on('prompt', (p) => renderer.prompt(p));
   job.on('end', (r) => renderer.end(r));
+  return job;
+}
 
-  // Ctrl+C: first asks ffmpeg to stop cleanly, second kills it.
-  const onSigint = () => job.cancel();
-  process.on('SIGINT', onSigint);
+/** Ctrl+C calls `onCancel` while `work` runs (first press: clean stop, second: kill). */
+async function withSigint<T>(onCancel: () => void, work: Promise<T>): Promise<T> {
+  process.on('SIGINT', onCancel);
   try {
-    const result = await job.done;
-    return result.exitCode;
+    return await work;
   } finally {
-    process.off('SIGINT', onSigint);
+    process.off('SIGINT', onCancel);
   }
+}
+
+/** Runs ffmpeg once per file from the `inputs` option. */
+async function runBatch(
+  ffmpegPath: string,
+  userArgs: readonly string[],
+  options: TregOptions,
+  io: CliIO,
+): Promise<number> {
+  const inputs = expandInputs(options.inputs, io.cwd);
+  const jobs = planBatch(inputs, userArgs, io.cwd);
+  const total = jobs.length;
+  const logFileFor = (job: BatchJob) =>
+    options.logFile && options.logFile !== 'auto'
+      ? fillOutputTemplate(options.logFile, job.input, job.index, total)
+      : options.logFile;
+
+  if (options.format === 'raw') {
+    let code = 0;
+    for (const job of jobs) {
+      const exit = await passthrough(ffmpegPath, job.args, io);
+      if (code === 0) code = exit;
+    }
+    return code;
+  }
+
+  const ui = createUi(options, io, analyzeArgs(userArgs).outputToStdout);
+  const text = ui.format === 'bar' || ui.format === 'line';
+  if (ui.format === 'json') {
+    writeJson(ui.jsonOut, {
+      type: 'batch',
+      jobs: jobs.map(({ index, input, outputs }) => ({ index, input, outputs })),
+    });
+  }
+
+  const results: RunResult[] = [];
+  let current: FfmpegRun | undefined;
+  let stopped = false;
+  const onCancel = () => {
+    stopped = true;
+    current?.cancel();
+  };
+
+  await withSigint(
+    onCancel,
+    (async () => {
+      for (const job of jobs) {
+        if (stopped) break;
+        if (text) io.stderr.write(formatJobLabel(job, total, ui.style) + '\n');
+        current = startJob(
+          ffmpegPath,
+          job.args,
+          logFileFor(job),
+          options,
+          io,
+          ui.renderer({ job: job.index }),
+        );
+        const result = await current.done;
+        results.push(result);
+        if (result.cancelled) break;
+      }
+    })(),
+  );
+
+  const summary = summarizeBatch(jobs, results);
+  if (ui.format === 'json') {
+    writeJson(ui.jsonOut, { type: 'summary', ...summary });
+  } else if (text || summary.failed + summary.cancelled > 0) {
+    io.stderr.write(formatBatchSummary(summary, ui.style).join('\n') + '\n');
+  }
+  return batchExitCode(summary);
+}
+
+function writeJson(out: Output, event: Record<string, unknown>): void {
+  out.write(JSON.stringify(event) + '\n');
 }
 
 async function ask(prompt: PromptInfo, io: CliIO): Promise<boolean> {

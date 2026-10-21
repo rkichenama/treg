@@ -4,7 +4,7 @@ export default defineConfig([
   {
     entry: { index: 'src/index.ts' },
     format: ['esm'],
-    target: 'node20',
+    target: 'node22',
     platform: 'node',
     dts: true,
     clean: true,
@@ -13,7 +13,7 @@ export default defineConfig([
   {
     entry: { treg: 'bin/treg.ts' },
     format: ['esm'],
-    target: 'node20',
+    target: 'node22',
     platform: 'node',
     sourcemap: true,
   },

@@ -10,5 +10,6 @@
   "showHeader": false,
   "showWarnings": false,
   "logFile": null,
-  "probe": false
+  "probe": false,
+  "inputs": []
 }

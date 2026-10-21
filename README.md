@@ -40,7 +40,7 @@ with control over the output and clearer failures. Thank you, Martin.
 
 |                   | ffpb                                                           | treg                                                                                                                  |
 | ----------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Runtime           | Python, installed with `pip`                                   | Node ≥ 20, installed from GitHub (not on npm)                                                                         |
+| Runtime           | Python, installed with `pip`                                   | Node ≥ 22.17, installed from GitHub (not on npm)                                                                      |
 | Progress source   | Reads ffmpeg's stats text from stderr                          | ffmpeg's machine-readable `-progress pipe:1` stream; stderr stats only when stdout carries media                      |
 | When ffmpeg fails | Prints ffmpeg's last stderr line, usually `Conversion failed!` | Prints ffmpeg's own error messages with the component that raised them, the stream mapping, and where the full log is |
 | Output            | `tqdm` bar                                                     | `bar`, `line`, `json` (NDJSON), `quiet` or `raw`, with a bar template you can change                                  |
@@ -65,7 +65,7 @@ the last 10 lines it printed instead.
 
 ## Install
 
-Requirements: Node 20 or newer, and `ffmpeg` on your `PATH` (or set `ffmpegPath`).
+Requirements: Node 22.17 or newer, and `ffmpeg` on your `PATH` (or set `ffmpegPath`).
 
 treg isn't on npm. Install the prebuilt package from a
 [GitHub release](https://github.com/rkichenama/treg/releases):
@@ -145,6 +145,7 @@ set to its default.
 | `showWarnings`     | `false`                                                              | Print ffmpeg's warnings while it runs                                                            |
 | `logFile`          | `null`                                                               | `null` for none, `"auto"` for a temp file kept only on failure, or a path                        |
 | `probe`            | `false`                                                              | Ask `ffprobe` for the duration when ffmpeg doesn't report one                                    |
+| `inputs`           | `[]`                                                                 | Files or glob patterns to convert one by one, replacing `-i`. See [Batch](#batch-many-files)     |
 
 ### Template tokens
 
@@ -176,6 +177,74 @@ instead of filling. Set `"probe": true` to ask `ffprobe` for the duration.
 {"type":"error","exitCode":1,"errors":[{"level":"error","component":"webm","message":"...","count":1}],"warnings":[],"mapping":["..."],"fallbackLines":[],"errorsSuppressed":false}
 {"type":"end","exitCode":1,"cancelled":false,"elapsedSec":0.4,"logFile":null}
 ```
+
+## Batch: many files
+
+Put `inputs` in your options file and treg runs ffmpeg once per file, with the same settings each
+time. It replaces `-i`: don't pass `-i` on the command line.
+
+```json
+{ "inputs": ["intro.mov", "clips/*.mov", "raw/**/*.{mp4,mkv}"] }
+```
+
+```sh
+treg --treg-option batch.json -c:v libx264 -crf 20 "out/{name}.mp4"
+```
+
+```
+[1/3] clips/a.mov → out/a.mp4
+out/a.mp4 ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰ 100% | 0:12/0:12 | 3.10x | ETA 0:00
+✔ done in 0:04 → a.mp4, 3.1 MiB
+[2/3] clips/b.mov → out/b.mp4
+✖ ffmpeg failed (exit 1)
+  ...
+[3/3] clips/c.mov → out/c.mp4
+✔ done in 0:06 → c.mp4, 4.4 MiB
+batch: 3 files, 2 done, 1 failed
+  ✖ clips/b.mov: in#0: Error opening input: Invalid data found when processing input
+```
+
+**Inputs**
+
+- Each entry is a file path or a glob: `*`, `?`, `**`, `[abc]` or `{mov,mp4}`.
+- Paths are relative to the current directory.
+- A plain path must exist, and a glob must match at least one file. treg lists every problem before running anything.
+- A glob's matches are sorted naturally (`take2` before `take10`). Directories and duplicates are skipped.
+
+**Output names**
+
+The output argument is a template, filled in for each file:
+
+| Token     | For `clips/a.mov`                              |
+| --------- | ---------------------------------------------- |
+| `{name}`  | `a`                                            |
+| `{ext}`   | `mov`                                          |
+| `{dir}`   | `clips`                                        |
+| `{index}` | `1`, zero-padded to the batch size (`01`…`12`) |
+
+treg refuses to start if two files would write the same output, or if an output would overwrite
+an input.
+
+**Always quote templates.** Unquoted, PowerShell reads `{...}` as a script block and drops the
+rest of the argument: `out/{name}.mp4` arrives as `out/`. Write `"out/{name}.mp4"`.
+
+**Running**
+
+- **Input options:** each file is added as `-i <file>` before your arguments, so your arguments are output options. For input options like `-re`, `-ss` (fast seek), `-hwaccel` or `-stream_loop`, mark where the file goes with `-i "{input}"`:
+
+  ```sh
+  treg --treg-option batch.json -ss 30 -i "{input}" -t 10 "clips/{name}-cut.mp4"
+  ```
+
+  Any other `-i` is refused while `inputs` is set.
+
+- A failed file doesn't stop the batch. Ctrl+C cancels the current file and skips the rest.
+- **Exit code:**
+  - 0 when every file succeeds.
+  - Otherwise the first failed file's code.
+  - After a cancel, 130 (or ffmpeg's code, if non-zero).
+- **`logFile`** takes the same tokens, e.g. `"logs/{name}.log"`.
+- **`json` format:** a `batch` event lists the jobs first. Every event carries `"job": <index>`, and a `summary` event comes last.
 
 ## Use from code
 

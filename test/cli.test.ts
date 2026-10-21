@@ -1,4 +1,5 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -109,5 +110,71 @@ describe.skipIf(!ffmpegPath)('main (real ffmpeg)', () => {
     const code = await main([...SOURCE, '-t', '1', 'taken.mp4'], t);
     expect(code).not.toBe(0);
     expect(t.err.text).toContain("File 'taken.mp4' already exists. Exiting.");
+  });
+});
+
+describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
+  const src = join(work, 'batch');
+  mkdirSync(src, { recursive: true });
+  for (const name of ['take1', 'take2', 'take10']) {
+    spawnSync(ffmpegPath!, [
+      '-y',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc=duration=0.5:size=160x120:rate=25',
+      '-c:v',
+      'mpeg4',
+      join(src, `${name}.mp4`),
+    ]);
+  }
+  writeFileSync(join(src, 'broken.mp4'), 'not a video');
+
+  it('converts each file, keeps going after a failure, and summarizes', async () => {
+    const t = io();
+    const file = options('batch.json', { inputs: ['batch/*.mp4'] });
+    const code = await main(
+      ['--treg-option', file, '-y', '-c:v', 'mpeg4', '{dir}/{name}-out.mkv'],
+      t,
+    );
+    expect(code).not.toBe(0);
+    for (const name of ['take1', 'take2', 'take10']) {
+      expect(existsSync(join(src, `${name}-out.mkv`))).toBe(true);
+    }
+    const err = t.err.text.replace(/\\/g, '/');
+    // Natural order: broken, take1, take2, take10.
+    expect(err).toMatch(
+      /\[1\/4\] batch\/broken\.mp4[\s\S]*\[2\/4\] batch\/take1\.mp4[\s\S]*\[4\/4\] batch\/take10\.mp4/,
+    );
+    expect(err).toContain('batch: 4 files, 3 done, 1 failed');
+    expect(err).toMatch(/✖ batch\/broken\.mp4: .+/);
+  });
+
+  it('tags JSON events with the job and ends with a summary', async () => {
+    const t = io();
+    const file = options('batch-json.json', { format: 'json', inputs: ['batch/take*.mp4'] });
+    const code = await main(
+      ['--treg-option', file, '-y', '-c:v', 'mpeg4', '{dir}/{name}-json.mkv'],
+      t,
+    );
+    expect(code).toBe(0);
+    const events = t.out.text
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l) as { type: string; job?: number; done?: number });
+    expect(events[0]?.type).toBe('batch');
+    expect(events.at(-1)).toMatchObject({ type: 'summary', done: 3 });
+    const jobs = new Set(events.filter((e) => e.type === 'end').map((e) => e.job));
+    expect([...jobs]).toEqual([1, 2, 3]);
+  });
+
+  it('refuses -i on the command line while inputs is set', async () => {
+    const t = io();
+    const file = options('batch-i.json', { inputs: ['batch/take1.mp4'] });
+    expect(await main(['--treg-option', file, '-i', 'x.mp4', 'o.mkv'], t)).toBe(2);
+    expect(t.err.text).toContain('replaces -i');
   });
 });

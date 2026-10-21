@@ -194,10 +194,12 @@ export class JsonRenderer implements Renderer {
   constructor(
     private readonly ctx: RenderContext,
     private readonly json: Output,
+    /** Added to every event, e.g. `{ job: 2 }` in a batch. */
+    private readonly extra: Record<string, unknown> = {},
   ) {}
 
   private emit(event: Record<string, unknown>): void {
-    this.json.write(JSON.stringify(event) + '\n');
+    this.json.write(JSON.stringify({ ...event, ...this.extra }) + '\n');
   }
 
   start(info: StartInfo): void {

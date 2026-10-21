@@ -30,6 +30,11 @@ export interface TregOptions {
   logFile: string | null;
   /** Run ffprobe when ffmpeg doesn't report the input duration. */
   probe: boolean;
+  /**
+   * Files or glob patterns to convert one by one; replaces -i. Output
+   * arguments become templates ({name} {ext} {dir} {index}). Empty: normal run.
+   */
+  inputs: string[];
 }
 
 export const DEFAULT_OPTIONS: TregOptions = {
@@ -45,7 +50,17 @@ export const DEFAULT_OPTIONS: TregOptions = {
   showWarnings: false,
   logFile: null,
   probe: false,
+  inputs: [],
 };
+
+/** A fresh copy of the defaults, so callers can't mutate the shared object. */
+function defaults(): TregOptions {
+  return {
+    ...DEFAULT_OPTIONS,
+    barChars: { ...DEFAULT_OPTIONS.barChars },
+    inputs: [...DEFAULT_OPTIONS.inputs],
+  };
+}
 
 type Check = (value: unknown) => string | undefined;
 
@@ -82,6 +97,10 @@ const CHECKS: Record<keyof TregOptions, Check> = {
       ? undefined
       : 'must be null, "auto" or a file path',
   probe: isBoolean,
+  inputs: (v) =>
+    Array.isArray(v) && v.every((x) => typeof x === 'string' && x !== '')
+      ? undefined
+      : 'must be a list of file paths or glob patterns',
 };
 
 export interface ResolvedOptions {
@@ -101,10 +120,7 @@ export function resolveOptions(input: unknown, source = 'options'): ResolvedOpti
   const raw = input as Record<string, unknown>;
   const errors: string[] = [];
   const warnings: string[] = [];
-  const options: TregOptions = {
-    ...DEFAULT_OPTIONS,
-    barChars: { ...DEFAULT_OPTIONS.barChars },
-  };
+  const options = defaults();
   const target = options as unknown as Record<string, unknown>;
 
   for (const [key, value] of Object.entries(raw)) {
@@ -146,7 +162,7 @@ function mergeBarChars(value: unknown, options: TregOptions, source: string): st
 export function loadOptions(path?: string): ResolvedOptions {
   if (path === undefined) {
     return {
-      options: { ...DEFAULT_OPTIONS, barChars: { ...DEFAULT_OPTIONS.barChars } },
+      options: defaults(),
       warnings: [],
     };
   }

@@ -1,3 +1,5 @@
+import type { BatchJob } from '../batch/plan.js';
+import type { BatchSummary } from '../batch/summary.js';
 import type { ProgressSnapshot, RunResult } from '../ffmpeg/run.js';
 import { formatClock } from '../parse/time.js';
 import type { Style } from '../render/style.js';
@@ -106,6 +108,25 @@ export function formatSuccess(result: RunResult, file: string, style: Style): st
     lines.push(
       style.yellow(`  ffmpeg logged ${result.errorCount} error(s) but finished; check the output.`),
     );
+  }
+  return lines;
+}
+
+/** `[2/5] clips/b.mov → b.mp4`, printed before each file of a batch. */
+export function formatJobLabel(job: BatchJob, total: number, style: Style): string {
+  return `${style.dim(`[${job.index}/${total}]`)} ${job.input} → ${job.outputs.join(', ')}`;
+}
+
+/** End-of-batch summary: counts, then each file that failed or was cancelled. */
+export function formatBatchSummary(summary: BatchSummary, style: Style): string[] {
+  const parts = [`${summary.done} done`];
+  if (summary.failed > 0) parts.push(style.red(`${summary.failed} failed`));
+  if (summary.cancelled > 0) parts.push(style.yellow(`${summary.cancelled} cancelled`));
+  if (summary.skipped > 0) parts.push(style.yellow(`${summary.skipped} skipped`));
+  const lines = [style.bold(`batch: ${summary.total} files, ${parts.join(', ')}`)];
+  for (const job of summary.jobs) {
+    if (job.status === 'failed') lines.push(`  ${style.red('✖')} ${job.input}: ${job.error ?? ''}`);
+    if (job.status === 'cancelled') lines.push(`  ${style.yellow('■')} ${job.input}: cancelled`);
   }
   return lines;
 }

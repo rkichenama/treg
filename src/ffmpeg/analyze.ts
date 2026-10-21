@@ -67,6 +67,8 @@ export interface ArgAnalysis {
   overwrite?: 'yes' | 'no';
   inputs: string[];
   outputs: string[];
+  /** Positions of the outputs in the args. */
+  outputIndexes: number[];
   /** True when the args ask ffmpeg for information (-version, -encoders...). */
   infoQuery: boolean;
   outputToStdout: boolean;
@@ -91,6 +93,7 @@ export function analyzeArgs(args: readonly string[]): ArgAnalysis {
   const a: ArgAnalysis = {
     inputs: [],
     outputs: [],
+    outputIndexes: [],
     infoQuery: false,
     outputToStdout: false,
     inputFromStdin: false,
@@ -104,6 +107,7 @@ export function analyzeArgs(args: readonly string[]): ArgAnalysis {
     const tok = args[i] ?? '';
     if (!tok.startsWith('-') || tok === '-') {
       a.outputs.push(tok);
+      a.outputIndexes.push(i);
       if (STDOUT.has(tok)) a.outputToStdout = true;
       continue;
     }
