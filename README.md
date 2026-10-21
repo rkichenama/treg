@@ -67,13 +67,25 @@ the last 10 lines it printed instead.
 
 Requirements: Node 20 or newer, and `ffmpeg` on your `PATH` (or set `ffmpegPath`).
 
+treg isn't on npm. Install the prebuilt package from a
+[GitHub release](https://github.com/rkichenama/treg/releases):
+
 ```sh
-pnpm add -g github:rkichenama/treg
+pnpm add -g https://github.com/rkichenama/treg/releases/download/v0.1.0/treg-0.1.0.tgz
 # or
-npm install -g github:rkichenama/treg
+npm install -g https://github.com/rkichenama/treg/releases/download/v0.1.0/treg-0.1.0.tgz
 ```
 
-The package builds itself on install. treg has no runtime dependencies.
+The release file is already built, so installing runs no scripts. treg has no runtime
+dependencies. (Installing straight from the repository with `pnpm add -g github:rkichenama/treg`
+fails on pnpm 12, which blocks build scripts in git-hosted packages.)
+
+To build from source instead:
+
+```sh
+git clone https://github.com/rkichenama/treg && cd treg
+pnpm install && pnpm pack && pnpm add -g ./treg-0.1.0.tgz
+```
 
 ### PowerShell
 
