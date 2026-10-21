@@ -98,6 +98,25 @@ describe('resolveOptions', () => {
     expect(() => resolveOptions([])).toThrow(/must be a JSON object/);
   });
 
+  it('rejects a barChars value that is not an object', () => {
+    expect(() => resolveOptions({ barChars: '#' }, 'o.json')).toThrow(
+      'o.json: "barChars" must be an object with "complete" and "incomplete"',
+    );
+    expect(() => resolveOptions({ barChars: ['#', '-'] }, 'o.json')).toThrow(
+      'o.json: "barChars" must be an object with "complete" and "incomplete"',
+    );
+  });
+
+  it('names a barChars key it does not know', () => {
+    try {
+      resolveOptions({ barChars: { complete: '#', middle: '-' } }, 'o.json');
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(TregError);
+      expect((err as Error).message).toBe('o.json: unknown option "barChars.middle"');
+    }
+  });
+
   it('does not share default objects between calls', () => {
     const before = DEFAULT_OPTIONS.barChars.complete;
     const a = resolveOptions({ barChars: { complete: '#' } }).options;

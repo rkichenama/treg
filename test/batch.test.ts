@@ -164,6 +164,16 @@ describe('batch summary', () => {
     expect(text).toContain('■ c.mov: cancelled');
   });
 
+  it('leaves the failed count out of the header when nothing failed', () => {
+    const s = summarizeBatch(jobs, [run({}), run({ cancelled: true })]);
+    const lines = formatBatchSummary(s, createStyle(false));
+    expect(lines[0]).toBe('batch: 4 files, 1 done, 1 cancelled, 2 skipped');
+    expect(lines).toEqual([
+      'batch: 4 files, 1 done, 1 cancelled, 2 skipped',
+      '  ■ b.mov: cancelled',
+    ]);
+  });
+
   it('exits 0 when all succeed, 130 when cancelled cleanly', () => {
     expect(
       batchExitCode(

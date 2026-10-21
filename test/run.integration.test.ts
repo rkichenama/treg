@@ -2,7 +2,8 @@ import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { findExecutable } from '../src/ffmpeg/locate.js';
+import { findExecutable, locateFfprobe } from '../src/ffmpeg/locate.js';
+import { probeDuration } from '../src/ffmpeg/probe.js';
 import { runFfmpeg, type ProgressSnapshot, type RunOptions } from '../src/ffmpeg/run.js';
 import type { LogEntry } from '../src/types.js';
 
@@ -18,6 +19,8 @@ function run(args: string[], extra: Partial<RunOptions> = {}) {
   job.on('log', (l) => logs.push(l));
   return { job, progress, logs };
 }
+
+const ffprobeOf = () => locateFfprobe(ffmpegPath!) ?? 'ffprobe';
 
 describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
   it('reports progress with percent against -t and exits 0', async () => {
@@ -89,6 +92,31 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
     expect(result.cancelled).toBe(true);
     expect(result.failure).toBeUndefined();
     expect(result.elapsedSec).toBeLessThan(15);
+    expect(await probeDuration(ffprobeOf(), join(work, 'long.mp4'))).toBeGreaterThan(0);
+  });
+
+  it('kills ffmpeg on a second cancel()', async () => {
+    const { job } = run(['-y', '-re', ...SOURCE, '-t', '30', '-c:v', 'mpeg4', 'stop-kill.mp4']);
+    job.once('progress', () => {
+      job.cancel();
+      job.cancel();
+    });
+    const result = await job.done;
+    expect(result.cancelled).toBe(true);
+    expect(result.elapsedSec).toBeLessThan(15);
+    expect(result.ffmpegExitCode).toBe(255);
+  });
+
+  it('takes percent from the frame limit when no duration is known', async () => {
+    const { job, progress } = run(
+      ['-y', ...SOURCE, '-frames:v', '50', '-c:v', 'mpeg4', 'frames.mp4'],
+      { probe: true },
+    );
+    const result = await job.done;
+    expect(result.exitCode).toBe(0);
+    const last = progress.at(-1)!;
+    expect(last.totalSec).toBeUndefined();
+    expect(last.percent).toBe(100);
   });
 
   it('keeps an auto log file only on failure', async () => {
