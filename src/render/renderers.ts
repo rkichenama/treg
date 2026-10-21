@@ -11,7 +11,7 @@ import {
   formatWarning,
 } from '../report/format.js';
 import type { HeaderInfo, LogEntry } from '../types.js';
-import type { Output, Style } from './style.js';
+import { visibleLength, type Output, type Style } from './style.js';
 import { layoutLine, tokenValues } from './template.js';
 
 export interface Renderer {
@@ -97,6 +97,8 @@ abstract class TextRenderer implements Renderer {
 /** Live single-line progress bar for terminals. */
 export class BarRenderer extends TextRenderer {
   private drawn = false;
+  /** Visible width of the line on screen, to find its rows after a resize. */
+  private drawnWidth = 0;
   private ended = false;
   private lastDraw = -Infinity;
   private tick = 0;
@@ -122,8 +124,31 @@ export class BarRenderer extends TextRenderer {
   }
 
   protected override clear(): void {
-    if (this.drawn) this.ctx.out.write('\r\x1b[2K');
+    if (this.drawn) this.ctx.out.write(this.erase(this.columns()));
     this.drawn = false;
+  }
+
+  /**
+   * The terminal width now. Node on Windows can miss a resize and keep a stale
+   * `columns`, so ask the tty again.
+   */
+  private columns(): number {
+    const out = this.ctx.out as Output & { _refreshSize?: () => void };
+    try {
+      out._refreshSize?.();
+    } catch {
+      // Keep the last known width.
+    }
+    return Math.max(1, out.columns ?? 80);
+  }
+
+  /**
+   * Moves to the start of the drawn line and clears it. A terminal narrowed
+   * since the last draw has wrapped the line onto several rows; clear them all.
+   */
+  private erase(columns: number): string {
+    const rows = this.drawn ? Math.ceil(this.drawnWidth / columns) : 1;
+    return rows > 1 ? `\r\x1b[${rows - 1}A\x1b[J` : '\r\x1b[2K';
   }
 
   protected override message(lines: string[]): void {
@@ -138,18 +163,20 @@ export class BarRenderer extends TextRenderer {
 
   private draw(snap: ProgressSnapshot): void {
     const { options, out, style } = this.ctx;
+    const columns = this.columns();
     const line = layoutLine({
       template: options.template,
       values: tokenValues(snap, this.file),
       fileStyle: style.bold,
-      columns: out.columns ?? 80,
+      columns,
       barWidth: options.barWidth,
       chars: options.barChars,
       fraction: snap.percent !== undefined ? snap.percent / 100 : undefined,
       tick: this.tick++,
     });
-    out.write(`\r\x1b[2K${line}`);
+    out.write(this.erase(columns) + line);
     this.drawn = true;
+    this.drawnWidth = visibleLength(line);
   }
 }
 

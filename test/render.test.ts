@@ -212,6 +212,38 @@ describe('renderers', () => {
     expect(out.text).toMatch(/✔ done in 00:04 → b\.mkv\n$/);
   });
 
+  it('bar clears every row of a line wrapped by a narrower terminal', () => {
+    const { renderer, out } = setup('bar');
+    renderer.progress(snap(10));
+    out.columns = 25;
+    out.text = '';
+    renderer.progress(snap(20));
+    // The 59-wide line now covers 3 rows of 25.
+    const erase = '\r\x1b[2A\x1b[J';
+    expect(out.text.startsWith(erase)).toBe(true);
+    expect(visibleLength(out.text.slice(erase.length))).toBe(24);
+    out.text = '';
+    renderer.progress(snap(30));
+    expect(out.text.startsWith('\r\x1b[2K')).toBe(true);
+  });
+
+  it('bar asks the tty for its width when Node missed a resize', () => {
+    const { renderer, out } = setup('bar');
+    renderer.progress(snap(10));
+    let live = 25;
+    Object.assign(out, { _refreshSize: () => (out.columns = live) });
+    // eslint-disable-next-line no-control-regex -- strips the erase sequence
+    const drawn = () => visibleLength(out.text.replace(/^\r(\x1b\[\d+A)?\x1b\[2?[JK]/, ''));
+    out.text = '';
+    renderer.progress(snap(20));
+    expect(out.text.startsWith('\r\x1b[2A\x1b[J')).toBe(true);
+    expect(drawn()).toBe(24);
+    live = 40;
+    out.text = '';
+    renderer.progress(snap(30));
+    expect(drawn()).toBe(39);
+  });
+
   it('bar prints the failure report instead of a summary', () => {
     const { renderer, out } = setup('bar');
     renderer.progress(snap(10));
