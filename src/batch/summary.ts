@@ -22,6 +22,7 @@ export interface BatchSummary {
   jobs: BatchJobResult[];
 }
 
+/* istanbul ignore next -- @preserve */
 function firstError(result: RunResult): string {
   const f = result.failure;
   const e = f?.errors[0];
@@ -54,11 +55,13 @@ export function summarizeBatch(
   };
 }
 
-/** First failed file's code; else 130 (or the file's code) when cancelled; else 0. */
+/**
+ * First failed file's code; else the cancelled file's code, like a single run
+ * (0 after a clean stop); else 0.
+ */
 export function batchExitCode(summary: BatchSummary): number {
   const failed = summary.jobs.find((j) => j.status === 'failed');
   if (failed) return failed.exitCode ?? 1;
   const cancelled = summary.jobs.find((j) => j.status === 'cancelled');
-  if (cancelled) return cancelled.exitCode ? cancelled.exitCode : 130;
-  return 0;
+  return cancelled?.exitCode ?? 0;
 }

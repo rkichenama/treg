@@ -1,14 +1,20 @@
 import { spawn } from 'node:child_process';
 
-/** Asks ffprobe for a file's duration in seconds. Resolves undefined on any failure. */
-/* istanbul ignore next -- @preserve */
-export function probeDuration(ffprobePath: string, input: string): Promise<number | undefined> {
+/**
+ * Asks ffprobe for a file's duration in seconds. Resolves undefined on any
+ * failure, or when `signal` aborts (which kills ffprobe).
+ */
+export function probeDuration(
+  ffprobePath: string,
+  input: string,
+  signal?: AbortSignal,
+): Promise<number | undefined> {
   return new Promise((resolve) => {
     let out = '';
     const child = spawn(
       ffprobePath,
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', input],
-      { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+      { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, signal },
     );
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => (out += chunk));

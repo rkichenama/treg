@@ -238,11 +238,11 @@ rest of the argument: `out/{name}.mp4` arrives as `out/`. Write `"out/{name}.mp4
 
   Any other `-i` is refused while `inputs` is set.
 
-- A failed file doesn't stop the batch. Ctrl+C cancels the current file and skips the rest.
+- A failed file doesn't stop the batch. Ctrl+C cancels the current file (or its pending probe) and skips the rest.
 - **Exit code:**
   - 0 when every file succeeds.
   - Otherwise the first failed file's code.
-  - After a cancel, 130 (or ffmpeg's code, if non-zero).
+  - After a cancel, the cancelled file's code: 0 after a clean stop, ffmpeg's code if it was killed.
 - **`logFile`** takes the same tokens, e.g. `"logs/{name}.log"`.
 - **`json` format:** a `batch` event lists the jobs first. Every event carries `"job": <index>`, and a `summary` event comes last.
 
@@ -265,7 +265,7 @@ if (result.failure) {
 ```
 
 Events: `start`, `header`, `progress`, `log`, `prompt`, `end`. `job.cancel()` stops cleanly; call
-it twice to kill. Parsers (`StderrParser`, `ProgressParser`, `parseLogLine`) and renderers are
+it twice to kill. Called before ffmpeg starts, it stops the probe and ffmpeg never runs. Parsers (`StderrParser`, `ProgressParser`, `parseLogLine`) and renderers are
 exported too.
 
 ## Development

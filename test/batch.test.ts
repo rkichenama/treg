@@ -174,7 +174,7 @@ describe('batch summary', () => {
     ]);
   });
 
-  it('exits 0 when all succeed, 130 when cancelled cleanly', () => {
+  it('exits 0 when all succeed or a file is cancelled cleanly', () => {
     expect(
       batchExitCode(
         summarizeBatch(
@@ -183,7 +183,7 @@ describe('batch summary', () => {
         ),
       ),
     ).toBe(0);
-    expect(batchExitCode(summarizeBatch(jobs, [run({ cancelled: true })]))).toBe(130);
+    expect(batchExitCode(summarizeBatch(jobs, [run({ cancelled: true })]))).toBe(0);
     expect(batchExitCode(summarizeBatch(jobs, [run({ cancelled: true, exitCode: 255 })]))).toBe(
       255,
     );

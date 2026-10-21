@@ -95,6 +95,44 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
     expect(await probeDuration(ffprobeOf(), join(work, 'long.mp4'))).toBeGreaterThan(0);
   });
 
+  it('stops a pending probe when its signal aborts', async () => {
+    const file = join(work, 'probe-me.mp4');
+    await run(['-y', ...SOURCE, '-t', '1', '-c:v', 'mpeg4', 'probe-me.mp4']).job.done;
+    expect(await probeDuration(ffprobeOf(), file)).toBeGreaterThan(0);
+    const abort = new AbortController();
+    const pending = probeDuration(ffprobeOf(), file, abort.signal);
+    abort.abort();
+    expect(await pending).toBeUndefined();
+  });
+
+  it('cancel() during the probe stops it and never starts ffmpeg', async () => {
+    const { job } = run(['-y', ...SOURCE, '-t', '2', '-c:v', 'mpeg4', 'never-started.mp4'], {
+      probe: true,
+    });
+    let started = false;
+    job.on('start', () => (started = true));
+    // run() has spawned ffprobe by the time this macrotask runs.
+    setImmediate(() => job.cancel());
+    const result = await job.done;
+    expect(started).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(result.failure).toBeUndefined();
+    expect(existsSync(join(work, 'never-started.mp4'))).toBe(false);
+  });
+
+  it('cancel() before the run begins never starts ffmpeg', async () => {
+    const { job } = run(['-y', ...SOURCE, '-t', '2', '-c:v', 'mpeg4', 'never-begun.mp4']);
+    let started = false;
+    job.on('start', () => (started = true));
+    job.cancel();
+    const result = await job.done;
+    expect(started).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(existsSync(join(work, 'never-begun.mp4'))).toBe(false);
+  });
+
   it('kills ffmpeg on a second cancel()', async () => {
     const { job } = run(['-y', '-re', ...SOURCE, '-t', '30', '-c:v', 'mpeg4', 'stop-kill.mp4']);
     job.once('progress', () => {

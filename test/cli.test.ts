@@ -335,14 +335,32 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
     }
     const file = options('batch-sigint.json', { inputs: ['long/*.mp4'] });
     onText(t.err, /\[\s*\d+%\]/, () => process.emit('SIGINT'));
-    await main(
+    const code = await main(
       ['--treg-option', file, '-re', '-i', '{input}', '-c:v', 'mpeg4', '{dir}/{name}-cut.mkv'],
       t,
     );
+    expect(code).toBe(0);
     expect(t.err.text).toContain('batch: 2 files, 0 done, 1 cancelled, 1 skipped');
     expect(existsSync(join(long, 'long1-cut.mkv'))).toBe(true);
     expect(existsSync(join(long, 'long2-cut.mkv'))).toBe(false);
   }, 60_000);
+
+  it('Ctrl+C between files starts no further file', async () => {
+    const t = io();
+    const file = options('batch-between.json', {
+      inputs: ['batch/take1.mp4', 'batch/take2.mp4'],
+    });
+    // The first file's summary prints after ffmpeg exits, before the next file starts.
+    onText(t.err, /✔ done/, () => process.emit('SIGINT'));
+    const code = await main(
+      ['--treg-option', file, '-y', '-c:v', 'mpeg4', '{dir}/{name}-between.mkv'],
+      t,
+    );
+    expect(code).toBe(0);
+    expect(t.err.text).toContain('batch: 2 files, 1 done, 1 skipped');
+    expect(existsSync(join(src, 'take1-between.mkv'))).toBe(true);
+    expect(existsSync(join(src, 'take2-between.mkv'))).toBe(false);
+  });
 
   it('refuses -i on the command line while inputs is set', async () => {
     const t = io();

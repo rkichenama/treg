@@ -101,6 +101,8 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
   private child: ChildProcess | undefined;
   private cancelRequests = 0;
   private cancelled = false;
+  /** Stops work that runs before ffmpeg starts (the probe). */
+  private readonly beforeStart = new AbortController();
 
   constructor(private readonly opts: RunOptions) {
     super();
@@ -109,13 +111,19 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
     this.done.catch(() => undefined);
   }
 
-  /** First call asks ffmpeg to finish cleanly (like pressing q); second kills it. */
-  /* istanbul ignore next -- @preserve */
+  /**
+   * First call asks ffmpeg to finish cleanly (like pressing q); second kills it.
+   * Before ffmpeg starts, stops the probe and ffmpeg never starts.
+   */
   cancel(): void {
     this.cancelled = true;
     this.cancelRequests++;
     const child = this.child;
-    if (!child || child.exitCode !== null) return;
+    if (!child) {
+      this.beforeStart.abort();
+      return;
+    }
+    if (child.exitCode !== null) return;
     if (this.cancelRequests === 1 && child.stdin?.writable) {
       child.stdin.write('q');
     } else {
@@ -133,10 +141,11 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
 
     let probed: number | undefined;
     const firstInput = analysis.inputs[0];
-    if (opts.probe && firstInput && !analysis.inputFromStdin) {
+    if (opts.probe && firstInput && !analysis.inputFromStdin && !this.cancelled) {
       const ffprobe = locateFfprobe(opts.ffmpegPath, { env: opts.env ?? process.env });
-      if (ffprobe) probed = await probeDuration(ffprobe, firstInput);
+      if (ffprobe) probed = await probeDuration(ffprobe, firstInput, this.beforeStart.signal);
     }
+    if (this.cancelled) return this.endUnstarted();
 
     const { logPath, logStream } = openLog(opts.logFile);
     const started = Date.now();
@@ -262,6 +271,21 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
         ...(keptLog ? { logFile: keptLog } : {}),
       });
     }
+    this.emit('end', result);
+    return result;
+  }
+
+  /** Result of a run cancelled before ffmpeg started. */
+  private endUnstarted(): RunResult {
+    const result: RunResult = {
+      exitCode: 0,
+      ffmpegExitCode: 0,
+      cancelled: true,
+      elapsedSec: 0,
+      header: new StderrParser().header.info,
+      errorCount: 0,
+      warningCount: 0,
+    };
     this.emit('end', result);
     return result;
   }
