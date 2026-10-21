@@ -14,7 +14,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "examples",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20"
@@ -22,7 +24,7 @@
   "scripts": {
     "dev": "tsx bin/treg.ts",
     "build": "tsup",
-    "prepare": "tsup",
+    "prepack": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

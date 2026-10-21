@@ -8,7 +8,7 @@ import { runFfmpeg, type PromptInfo } from '../ffmpeg/run.js';
 import { createRenderer, resolveFormat } from '../render/index.js';
 import { createStyle, shouldColor, type Output } from '../render/style.js';
 import { VERSION } from '../version.js';
-import { OPTION_FLAG, splitArgs } from './args.js';
+import { OPTION_FLAG, rejoinColonSplits, splitArgs } from './args.js';
 import { loadOptions } from './options.js';
 
 export interface CliIO {
@@ -54,7 +54,7 @@ export async function main(argv: readonly string[], io: CliIO = defaultIO()): Pr
 }
 
 async function run(argv: readonly string[], io: CliIO): Promise<number> {
-  const { optionsPath, ffmpegArgs } = splitArgs(argv);
+  const { optionsPath, ffmpegArgs } = splitArgs(rejoinColonSplits(argv));
   if (ffmpegArgs.length === 0) {
     io.stderr.write(USAGE);
     return 1;

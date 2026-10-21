@@ -75,6 +75,24 @@ npm install -g github:rkichenama/treg
 
 The package builds itself on install. treg has no runtime dependencies.
 
+### PowerShell
+
+pnpm and npm install a `treg.ps1` wrapper next to `treg.cmd`, and PowerShell runs the `.ps1`
+one. That wrapper changes some arguments before treg sees them:
+
+- `-c:v` arrives as `-c:` and `v`. treg rejoins these, so `-c:v`, `-b:a` and
+  `-metadata:s:v:0` work.
+- An unquoted comma, as in `-vf scale=1280:-1,fps=30`, arrives as a space. treg can't undo this.
+
+To pass every argument unchanged, point `treg` at the `.cmd` wrapper. Add this line to your
+`$PROFILE`:
+
+```powershell
+Set-Alias treg treg.cmd
+```
+
+Or quote arguments that contain commas: `-vf 'scale=1280:-1,fps=30'`.
+
 ## Usage
 
 ```sh

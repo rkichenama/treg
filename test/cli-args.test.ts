@@ -2,9 +2,36 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { splitArgs } from '../src/cli/args.js';
+import { rejoinColonSplits, splitArgs } from '../src/cli/args.js';
 import { DEFAULT_OPTIONS, loadOptions, resolveOptions } from '../src/cli/options.js';
 import { TregError } from '../src/errors.js';
+
+describe('rejoinColonSplits', () => {
+  it('rejoins options PowerShell shims split at the colon', () => {
+    expect(
+      rejoinColonSplits(['-c:', 'v', 'mpeg4', '-b:', 'a', '128k', '-metadata:', 's:v:0', 'x=y']),
+    ).toEqual(['-c:v', 'mpeg4', '-b:a', '128k', '-metadata:s:v:0', 'x=y']);
+  });
+
+  it('leaves normal arguments alone', () => {
+    const args = [
+      '-c:v',
+      'mpeg4',
+      '-itsoffset',
+      '-1',
+      '-i',
+      'C:\\in.mp4',
+      'out:1.mp4',
+      '-ss',
+      '00:01',
+    ];
+    expect(rejoinColonSplits(args)).toEqual(args);
+  });
+
+  it('keeps a trailing colon option with nothing after it', () => {
+    expect(rejoinColonSplits(['-i', 'a', '-c:'])).toEqual(['-i', 'a', '-c:']);
+  });
+});
 
 describe('splitArgs', () => {
   it('passes everything through without --treg-option', () => {
