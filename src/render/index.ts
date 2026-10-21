@@ -12,7 +12,7 @@ import type { Output } from './style.js';
 export type RenderFormat = Exclude<Format, 'auto' | 'raw'>;
 
 /** auto: a live bar on a terminal, plain lines otherwise. */
-export function resolveFormat(format: Format, out: Output): Exclude<Format, 'auto'> {
+export function resolveFormat(format: Exclude<Format, 'raw'>, out: Output): RenderFormat {
   if (format !== 'auto') return format;
   return out.isTTY ? 'bar' : 'line';
 }

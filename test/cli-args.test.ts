@@ -72,8 +72,10 @@ describe('resolveOptions', () => {
   });
 
   it('does not share default objects between calls', () => {
+    const before = DEFAULT_OPTIONS.barChars.complete;
     const a = resolveOptions({ barChars: { complete: '#' } }).options;
-    expect(DEFAULT_OPTIONS.barChars.complete).toBe('█');
+    expect(DEFAULT_OPTIONS.barChars.complete).toBe(before);
+    expect(before).not.toBe('#');
     expect(a.barChars).not.toBe(DEFAULT_OPTIONS.barChars);
   });
 });

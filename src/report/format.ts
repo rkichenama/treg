@@ -9,7 +9,9 @@ import type { FailureReport } from './failure.js';
 const MAX_LABEL = 18;
 
 function issueLines(issues: Issue[], style: Style, color: (s: string) => string): string[] {
-  const labels = issues.map((i) => (i.component ? `${i.component}:` : ''));
+  // Untagged-by-component messages come from ffmpeg itself; label them so they
+  // don't read as a continuation of the line above.
+  const labels = issues.map((i) => `${i.component ?? 'ffmpeg'}:`);
   const width = Math.min(MAX_LABEL, Math.max(0, ...labels.map((l) => l.length)));
   const lines: string[] = [];
   issues.forEach((issue, n) => {

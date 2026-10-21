@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { VERSION } from '../src/index.js';
+import { main } from '../src/cli/main.js';
 
-process.stderr.write(`treg ${VERSION}: not implemented yet\n`);
-process.exitCode = 1;
+process.exitCode = await main(process.argv.slice(2));

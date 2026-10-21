@@ -37,7 +37,7 @@ export const DEFAULT_OPTIONS: TregOptions = {
   format: 'auto',
   template: '{file} {bar} {percent} | {time}/{total} | {speed} | ETA {eta}',
   barWidth: 'auto',
-  barChars: { complete: '█', incomplete: '░' },
+  barChars: { complete: '▰', incomplete: '▱' },
   color: 'auto',
   refreshHz: 10,
   lineEveryPercent: 10,
