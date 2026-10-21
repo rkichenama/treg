@@ -197,6 +197,18 @@ describe('renderers', () => {
     expect(lines[0]).toMatch(/^b\.mkv \[ {2}1%\]/);
   });
 
+  it('names stdout as the target when media goes there', () => {
+    const out = new Sink();
+    const renderer = createRenderer(
+      'line',
+      { options: DEFAULT_OPTIONS, out, style: plain },
+      new Sink(),
+    );
+    renderer.start({ ...start, analysis: analyzeArgs(['-i', 'in/a.mp4', '-f', 'mp4', '-']) });
+    renderer.end(result());
+    expect(out.text).toContain('✔ done in 0:05 → stdout');
+  });
+
   it('quiet prints only failures and cancels', () => {
     const ok = setup('quiet');
     ok.renderer.progress(snap(50));

@@ -45,12 +45,15 @@ function writeLines(out: Output, lines: string[]): void {
 /** Shared end-of-run and message output for the text renderers. */
 abstract class TextRenderer implements Renderer {
   protected file = '';
+  /** Where the result went, for the success line. */
+  private target = '';
   protected last: ProgressSnapshot | undefined;
 
   constructor(protected readonly ctx: RenderContext) {}
 
   start(info: StartInfo): void {
     this.file = displayFile(info);
+    this.target = info.analysis.outputToStdout ? 'stdout' : this.file;
   }
 
   header(header: HeaderInfo): void {
@@ -73,7 +76,7 @@ abstract class TextRenderer implements Renderer {
     const { style } = this.ctx;
     if (result.cancelled) this.message([formatCancelled(result, style)]);
     else if (result.failure) this.message(formatFailure(result.failure, style));
-    else this.message(formatSuccess(result, this.file, style));
+    else this.message(formatSuccess(result, this.target, style));
   }
 
   abstract progress(snap: ProgressSnapshot): void;
