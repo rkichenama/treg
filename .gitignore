@@ -3,4 +3,5 @@ dist/
 coverage/
 *.log
 *.stackdump
+docs/
 .DS_Store
