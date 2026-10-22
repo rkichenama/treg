@@ -71,9 +71,9 @@ treg isn't on npm. Install the prebuilt package from a
 [GitHub release](https://github.com/rkichenama/treg/releases):
 
 ```sh
-pnpm add -g https://github.com/rkichenama/treg/releases/download/v0.1.1/treg-0.1.1.tgz
+pnpm add -g https://github.com/rkichenama/treg/releases/download/v0.1.2/treg-0.1.2.tgz
 # or
-npm install -g https://github.com/rkichenama/treg/releases/download/v0.1.1/treg-0.1.1.tgz
+npm install -g https://github.com/rkichenama/treg/releases/download/v0.1.2/treg-0.1.2.tgz
 ```
 
 The release file is already built, so installing runs no scripts. treg has no runtime
@@ -84,7 +84,7 @@ To build from source instead:
 
 ```sh
 git clone https://github.com/rkichenama/treg && cd treg
-pnpm install && pnpm pack && pnpm add -g ./treg-0.1.1.tgz
+pnpm install && pnpm pack && pnpm add -g ./treg-0.1.2.tgz
 ```
 
 ### PowerShell
