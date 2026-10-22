@@ -1,5 +1,5 @@
-import { globSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { globSync, realpathSync, statSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { TregError } from '../errors.js';
 
 const GLOB_CHARS = /[*?[\]{}]/;
@@ -13,15 +13,33 @@ function isFile(path: string): boolean {
   }
 }
 
-/** Key for comparing paths: absolute, and case-insensitive on Windows. */
+/**
+ * The real path, so aliases (8.3 short names, symlinks, junctions) of one file
+ * match. A file that doesn't exist yet, such as an output, keeps its name under
+ * its folder's real path.
+ */
+function realPath(abs: string): string {
+  try {
+    return realpathSync.native(abs);
+  } catch {
+    try {
+      return join(realpathSync.native(dirname(abs)), basename(abs));
+    } catch {
+      return abs;
+    }
+  }
+}
+
+/** Key for comparing paths: real, absolute, and case-insensitive on Windows. */
 export function pathKey(path: string, cwd: string, platform = process.platform): string {
-  const abs = resolve(cwd, path);
+  const abs = realPath(resolve(cwd, path));
   return platform === 'win32' ? abs.toLowerCase() : abs;
 }
 
 /**
- * Turns the `inputs` option into a list of files. Plain paths must exist; each
- * glob must match at least one file. Matches are sorted naturally per entry,
+ * Turns the `inputs` option into a list of files. An entry naming an existing
+ * file is used as-is, even with glob characters in it; otherwise a plain path
+ * is missing, and a glob must match at least one file. Matches are sorted naturally per entry,
  * duplicates are dropped, directories are skipped. Every problem is reported
  * in one error.
  */
@@ -38,7 +56,10 @@ export function expandInputs(
     // Globs need forward slashes; on Windows a backslash is a separator, not an escape.
     const pattern = platform === 'win32' ? entry.replace(/\\/g, '/') : entry;
     let matches: string[];
-    if (GLOB_CHARS.test(pattern)) {
+    // An existing file wins, so names like "[site] clip.mp4" aren't read as globs.
+    if (isFile(resolve(cwd, entry))) {
+      matches = [entry];
+    } else if (GLOB_CHARS.test(pattern)) {
       matches = globSync(pattern, { cwd })
         .filter((m) => isFile(resolve(cwd, m)))
         .sort(natural.compare);
@@ -47,11 +68,8 @@ export function expandInputs(
         continue;
       }
     } else {
-      if (!isFile(resolve(cwd, entry))) {
-        problems.push(`"inputs": file not found: ${entry}`);
-        continue;
-      }
-      matches = [entry];
+      problems.push(`"inputs": file not found: ${entry}`);
+      continue;
     }
     for (const match of matches) {
       const key = pathKey(match, cwd, platform);

@@ -207,7 +207,8 @@ batch: 3 files, 2 done, 1 failed
 **Inputs**
 
 - Each entry is a file path or a glob: `*`, `?`, `**`, `[abc]` or `{mov,mp4}`.
-- Paths are relative to the current directory.
+- Paths are absolute, or relative to the current directory.
+- An entry that names an existing file is used as-is, so `[site] clip (2160p).mp4` works without escaping.
 - A plain path must exist, and a glob must match at least one file. treg lists every problem before running anything.
 - A glob's matches are sorted naturally (`take2` before `take10`). Directories and duplicates are skipped.
 

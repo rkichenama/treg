@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -16,6 +16,12 @@ for (const f of ['a.mov', 'take2.mov', 'take10.mov', 'take1.mov', 'clip.mp4', 'n
 mkdirSync(join(dir, 'sub'));
 writeFileSync(join(dir, 'sub', 'deep.mov'), '');
 mkdirSync(join(dir, 'folder.mov')); // a directory that matches *.mov
+
+// alias/ is a second name for real/; a junction needs no admin rights on Windows.
+const aliased = mkdtempSync(join(tmpdir(), 'treg-alias-'));
+mkdirSync(join(aliased, 'real'));
+writeFileSync(join(aliased, 'real', 'x.mov'), '');
+symlinkSync(join(aliased, 'real'), join(aliased, 'alias'), 'junction');
 
 const norm = (paths: string[]) => paths.map((p) => p.replace(/\\/g, '/'));
 
@@ -46,6 +52,47 @@ describe('expandInputs', () => {
 
   it('treats backslashes as separators on Windows', () => {
     expect(norm(expandInputs(['sub\\*.mov'], dir, 'win32'))).toEqual(['sub/deep.mov']);
+  });
+
+  it('accepts absolute file paths', () => {
+    const abs = join(dir, 'sub', 'deep.mov');
+    expect(expandInputs([abs], dir)).toEqual([abs]);
+    // cwd doesn't matter for an absolute path
+    expect(expandInputs([abs], join(dir, 'sub'))).toEqual([abs]);
+  });
+
+  it('accepts ./ and ../ relative paths', () => {
+    expect(norm(expandInputs(['./clip.mp4'], dir))).toEqual(['./clip.mp4']);
+    expect(norm(expandInputs(['../a.mov'], join(dir, 'sub')))).toEqual(['../a.mov']);
+    expect(norm(expandInputs(['../*.mp4'], join(dir, 'sub')))).toEqual(['../clip.mp4']);
+  });
+
+  it('expands absolute globs, with native separators', () => {
+    const want = ['a.mov', 'take1.mov', 'take2.mov', 'take10.mov'].map((f) => join(dir, f));
+    expect(norm(expandInputs([join(dir, '*.mov')], tmpdir()))).toEqual(norm(want));
+    expect(norm(expandInputs([norm([join(dir, '*.mov')])[0]!], tmpdir()))).toEqual(norm(want));
+  });
+
+  it('drops a file listed both absolute and relative', () => {
+    expect(norm(expandInputs(['a.mov', join(dir, 'a.mov'), join(dir, '*.mov')], dir))).toEqual([
+      'a.mov',
+      ...norm(['take1.mov', 'take2.mov', 'take10.mov'].map((f) => join(dir, f))),
+    ]);
+  });
+
+  it('drops a file reached through an aliased folder (8.3 name, junction, symlink)', () => {
+    expect(norm(expandInputs(['real/x.mov', 'alias/*.mov'], aliased))).toEqual(['real/x.mov']);
+  });
+
+  it('takes an existing file literally even when its name has glob characters', () => {
+    const name = '[site.com] A {b} (2160p)';
+    mkdirSync(join(dir, name));
+    writeFileSync(join(dir, name, `${name}.mp4`), '');
+    const entry = `./${name}/${name}.mp4`;
+    expect(expandInputs([entry], dir)).toEqual([entry]);
+    expect(expandInputs([join(dir, name, `${name}.mp4`)], dir)).toEqual([
+      join(dir, name, `${name}.mp4`),
+    ]);
   });
 
   it('reports every missing file and empty pattern at once', () => {
@@ -115,6 +162,15 @@ describe('planBatch', () => {
     );
     expect(() => planBatch(['a.mov'], ['{name}.mov'], dir)).toThrow(
       /would overwrite input "a\.mov"/,
+    );
+  });
+
+  it('sees an input and output in aliased folders as the same file', () => {
+    expect(() => planBatch(['real/x.mov'], ['alias/{name}.mov'], aliased)).toThrow(
+      /would overwrite input "real\/x\.mov"/,
+    );
+    expect(() => planBatch(['real/x.mov', 'alias/x.mov'], ['real/out.mp4'], aliased)).toThrow(
+      /both write/,
     );
   });
 
