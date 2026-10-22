@@ -1,6 +1,6 @@
 {
   "name": "treg",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "ffmpeg wrapper with a customizable progress display and readable error messages. A TypeScript port of ffpb.",
   "type": "module",
