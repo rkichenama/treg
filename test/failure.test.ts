@@ -26,11 +26,11 @@ function reportFor(name: string) {
 const EXPECTED: Record<(typeof FAILURE_FIXTURES)[number], string> = {
   'codec-mismatch':
     'webm:       Only VP8 or VP9 or AV1 video and Vorbis or Opus audio and WebVTT subtitles are supported for WebM.',
-  'missing-input': 'in#0: Error opening input: No such file or directory',
+  'missing-input': 'in#0:   Error opening input: No such file or directory',
   'unknown-encoder': "vost#0:0: Unknown encoder 'libnope'",
   'bad-option': "Unrecognized option 'nosuchoption'.",
   'bad-filter': "AVFilterGraph: No such filter: 'nosuchfilter'",
-  'bad-map': "Stream map '0:s' matches no streams.",
+  'bad-map': "Stream map '' matches no streams.",
   'exists-no-overwrite': "File 'existing.mp4' already exists. Exiting.",
   'overwrite-prompt-no': 'Not overwriting - exiting',
 };

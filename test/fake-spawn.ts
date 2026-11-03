@@ -184,7 +184,7 @@ export function runsUntilQuit(output = 'out.mp4'): FakeScript {
 
 /** The recorded overwrite prompt: stops at the question and acts on the answer. */
 export function asksToOverwrite(): FakeScript {
-  const { stderr = '' } = fromFixture('overwrite-prompt-no');
+  const { stderr = '', exitCode } = fromFixture('overwrite-prompt-no');
   const question = '[y/N] ';
   const cut = stderr.indexOf(question) + question.length;
   return {
@@ -194,7 +194,7 @@ export function asksToOverwrite(): FakeScript {
         child.exit(0);
       } else {
         child.stderr?.write(stderr.slice(cut));
-        child.exit(1);
+        child.exit(exitCode ?? 0);
       }
     },
   };

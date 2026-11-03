@@ -49,10 +49,10 @@ describe('ProgressParser', () => {
     const last = updates.at(-1)!;
     expect(last.done).toBe(true);
     expect(last.frame).toBe(125);
-    expect(last.timeSec).toBeCloseTo(4.99229, 4);
-    expect(last.sizeBytes).toBe(249872);
-    expect(last.bitrateKbps).toBe(400.4);
-    expect(last.speed).toBe(29.9);
+    expect(last.timeSec).toBeCloseTo(5, 4);
+    expect(last.sizeBytes).toBe(249801);
+    expect(last.bitrateKbps).toBe(399.7);
+    expect(last.speed).toBe(5.83);
     expect(updates.slice(0, -1).every((u) => !u.done)).toBe(true);
   });
 

@@ -12,6 +12,6 @@
     "existing.mp4"
   ],
   "stdin": null,
-  "exitCode": 1,
-  "ffmpegVersion": "ffmpeg version 2023-06-11-git-09621fd7d9-full_build-www.gyan.dev Copyright (c) 2000-2023 the FFmpeg developers"
+  "exitCode": 0,
+  "ffmpegVersion": "ffmpeg version 9.0.2-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers"
 }

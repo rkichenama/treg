@@ -9,11 +9,14 @@ output.mp4 ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱
 
 ```
 $ treg -i input.mp4 -c:v mjpeg out.webm
-✖ ffmpeg failed (exit 1)
+✖ ffmpeg failed (exit -22)
   webm:       Only VP8 or VP9 or AV1 video and Vorbis or Opus audio and WebVTT subtitles are supported for WebM.
   out#0/webm: Could not write header (incorrect codec parameters ?): Invalid argument
+  out#0/webm: Nothing was written into output file, because at least one of its streams received no packets.
 
   mapping: Stream #0:0 -> #0:0 (mpeg4 (native) -> mjpeg (native))
+           Stream #0:1 -> #0:1 (aac (native) -> opus (libopus))
+  Full log: set "logFile": "auto" in your --treg-option file.
 ```
 
 treg is a drop-in wrapper: every argument goes to `ffmpeg` unchanged, and treg exits with ffmpeg's exit code.
@@ -59,7 +62,9 @@ ffmpeg tag every line with its severity and the part of ffmpeg that wrote it:
 ```
 
 When ffmpeg fails, treg shows only the `error` and `fatal` lines, with repeats collapsed and
-pointer addresses removed. If you pass your own `-loglevel`, treg keeps your level and only adds
+pointer addresses removed. It also leaves out the lines ffmpeg logs as its threads stop, such as
+`Terminating thread with return code -22`, unless ffmpeg logged nothing else. Your log file and
+`log` events in `json` format keep every line. If you pass your own `-loglevel`, treg keeps your level and only adds
 the tags. If ffmpeg tagged nothing (an old build, or a crash before logging started), treg shows
 the last 10 lines it printed instead.
 
@@ -72,9 +77,9 @@ Requirements: Node 22.17 or newer, and `ffmpeg` on your `PATH` (or set `ffmpegPa
 > doesn't guarantee that either stays the same between versions. If progress or error messages look
 > wrong, check your version first.
 >
-> treg is built against `ffmpeg version 2023-06-11-git-09621fd7d9-full_build-www.gyan.dev`: its
-> tests replay output recorded from that build. The full test suite also last ran against a live
-> ffmpeg 9.0.2 on Windows. Tests don't run a live ffmpeg now, so other versions aren't checked.
+> treg is built against `ffmpeg version 9.0.2-full_build-www.gyan.dev`: its tests replay output
+> recorded from that build on Windows. Tests don't run a live ffmpeg, so other versions aren't
+> checked.
 
 treg isn't on npm. Install the prebuilt package from a
 [GitHub release](https://github.com/rkichenama/treg/releases):
@@ -183,8 +188,8 @@ instead of filling. Set `"probe": true` to ask `ffprobe` for the duration.
 {"type":"header","inputs":[{"index":0,"format":"mov,mp4,m4a,3gp,3g2,mj2","path":"in.mp4","durationSec":5,"fps":25,"streams":["..."]}],"outputs":["..."],"mapping":["..."]}
 {"type":"progress","done":false,"frame":64,"fps":0,"timeSec":2.56,"sizeBytes":131072,"bitrateKbps":409.6,"speed":31.2,"elapsedSec":0.1,"totalSec":5,"percent":51.2,"etaSec":0.08}
 {"type":"log","level":"error","component":"webm","message":"Only VP8 or VP9 ...","continued":false}
-{"type":"error","exitCode":1,"errors":[{"level":"error","component":"webm","message":"...","count":1}],"warnings":[],"mapping":["..."],"fallbackLines":[],"errorsSuppressed":false}
-{"type":"end","exitCode":1,"cancelled":false,"elapsedSec":0.4,"logFile":null}
+{"type":"error","exitCode":-22,"errors":[{"level":"error","component":"webm","message":"...","count":1}],"warnings":[],"mapping":["..."],"fallbackLines":[],"errorsSuppressed":false}
+{"type":"end","exitCode":-22,"cancelled":false,"elapsedSec":0.4,"logFile":null}
 ```
 
 ## Batch: many files
@@ -205,12 +210,12 @@ treg --treg-option batch.json -c:v libx264 -crf 20 "out/{name}.mp4"
 out/a.mp4 ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰ 100% | 00:12/00:12 | 3.10x | ETA 00:00
 ✔ done in 00:04 → a.mp4, 3.1 MiB
 [2/3] clips/b.mov → out/b.mp4
-✖ ffmpeg failed (exit 1)
+✖ ffmpeg failed (exit -1094995529)
   ...
 [3/3] clips/c.mov → out/c.mp4
 ✔ done in 00:06 → c.mp4, 4.4 MiB
 batch: 3 files, 2 done, 1 failed
-  ✖ clips/b.mov: in#0: Error opening input: Invalid data found when processing input
+  ✖ clips/b.mov: in#0: moov atom not found
 ```
 
 **Inputs**
