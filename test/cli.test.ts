@@ -1,17 +1,22 @@
-import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import { main, type CliIO } from '../src/cli/main.js';
-import { findExecutable, locateFfprobe } from '../src/ffmpeg/locate.js';
-import { probeDuration } from '../src/ffmpeg/probe.js';
+import {
+  fakeBin,
+  fromFixture,
+  outputOf,
+  runsUntilQuit,
+  scriptSpawn,
+  spawnCalls,
+  type SpawnCall,
+} from './fake-spawn.js';
 
-const ffmpegPath = findExecutable(process.env.FFMPEG_PATH ?? 'ffmpeg');
+const bin = fakeBin();
 const work = mkdtempSync(join(tmpdir(), 'treg-cli-'));
-const SOURCE = ['-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=25'];
-const ffprobeOf = () => locateFfprobe(ffmpegPath!) ?? 'ffprobe';
+const INPUT = ['-i', 'input.mp4'];
 
 class Sink {
   text = '';
@@ -30,7 +35,7 @@ function io(): CliIO & { out: Sink; err: Sink } {
     stdout: out,
     stderr: err,
     stdin: Readable.from([]),
-    env: { ...process.env, NO_COLOR: '1' },
+    env: { ...process.env, NO_COLOR: '1', PATH: bin.dir },
     cwd: work,
     out,
     err,
@@ -57,6 +62,8 @@ function options(name: string, value: unknown): string {
   return file;
 }
 
+const outputs = () => spawnCalls.map(outputOf);
+
 describe('main', () => {
   it('prints usage without ffmpeg arguments', async () => {
     const t = io();
@@ -80,16 +87,12 @@ describe('main', () => {
     expect(t.err.text).toContain('unknown option "colour"');
     expect(t.err.text).toContain('treg: ffmpeg not found');
   });
-});
 
-describe.skipIf(!ffmpegPath)('main (real ffmpeg)', () => {
   it('emits NDJSON with format json', async () => {
+    scriptSpawn(() => fromFixture('success'));
     const t = io();
     const file = options('json.json', { format: 'json' });
-    const code = await main(
-      ['--treg-option', file, '-y', ...SOURCE, '-t', '1', '-c:v', 'mpeg4', 'out.mp4'],
-      t,
-    );
+    const code = await main(['--treg-option', file, '-y', ...INPUT, '-c:v', 'mpeg4', 'out.mp4'], t);
     expect(code).toBe(0);
     const types = t.out.text
       .trim()
@@ -102,8 +105,9 @@ describe.skipIf(!ffmpegPath)('main (real ffmpeg)', () => {
   });
 
   it("prints ffmpeg's reason on failure, not the dump", async () => {
+    scriptSpawn(() => fromFixture('codec-mismatch'));
     const t = io();
-    const code = await main(['-y', ...SOURCE, '-t', '1', '-c:v', 'mjpeg', 'out.webm'], t);
+    const code = await main(['-y', ...INPUT, '-c:v', 'mjpeg', 'out.webm'], t);
     expect(code).not.toBe(0);
     expect(t.err.text).toContain('✖ ffmpeg failed');
     expect(t.err.text).toContain('webm:');
@@ -113,96 +117,79 @@ describe.skipIf(!ffmpegPath)('main (real ffmpeg)', () => {
   });
 
   it('prints line progress and a summary when not on a terminal', async () => {
+    scriptSpawn(() => fromFixture('success', { output: 'line.mp4' }));
     const t = io();
-    const code = await main(['-y', ...SOURCE, '-t', '1', '-c:v', 'mpeg4', 'line.mp4'], t);
+    const code = await main(['-y', ...INPUT, '-c:v', 'mpeg4', 'line.mp4'], t);
     expect(code).toBe(0);
     expect(t.err.text).toMatch(/line\.mp4 \[\s*\d+%\]/);
     expect(t.err.text).toMatch(/✔ done in \d+:\d\d → line\.mp4/);
   });
 
   it('hands an info query to ffmpeg untouched, even when outputs are named', async () => {
+    scriptSpawn(() => ({ exitCode: 0 }));
     const t = io();
-    expect(
-      await main(
-        ['-hide_banner', '-loglevel', 'error', '-version', '-i', 'missing.mp4', 'never.mp4'],
-        t,
-      ),
-    ).toBe(0);
+    const args = ['-hide_banner', '-loglevel', 'error', '-version', '-i', 'missing.mp4', 'n.mp4'];
+    expect(await main(args, t)).toBe(0);
     expect(t.err.text).toBe('');
-    expect(existsSync(join(work, 'never.mp4'))).toBe(false);
+    expect(spawnCalls[0]?.args).toEqual(args);
+    expect(spawnCalls[0]?.options.stdio).toBe('inherit');
   });
 
   it('hands a command with no output file to ffmpeg, which reports the mistake', async () => {
+    scriptSpawn(() => ({ exitCode: 1 }));
     const t = io();
-    expect(await main(['-hide_banner', '-loglevel', 'error', ...SOURCE], t)).toBe(1);
+    const args = ['-hide_banner', '-loglevel', 'error', ...INPUT];
+    expect(await main(args, t)).toBe(1);
     expect(t.err.text).toBe('');
+    expect(spawnCalls[0]?.args).toEqual(args);
   });
 
   it('format raw runs ffmpeg with no treg progress or summary', async () => {
+    scriptSpawn(() => fromFixture('success'));
     const t = io();
     const file = options('raw.json', { format: 'raw' });
-    const code = await main(
-      [
-        '--treg-option',
-        file,
-        '-y',
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        ...SOURCE,
-        '-t',
-        '1',
-        '-c:v',
-        'mpeg4',
-        'raw.mp4',
-      ],
-      t,
-    );
+    const args = ['-y', '-hide_banner', '-loglevel', 'error', ...INPUT, '-c:v', 'mpeg4', 'raw.mp4'];
+    const code = await main(['--treg-option', file, ...args], t);
     expect(code).toBe(0);
-    expect(existsSync(join(work, 'raw.mp4'))).toBe(true);
+    expect(spawnCalls[0]?.args).toEqual(args);
+    expect(spawnCalls[0]?.options.stdio).toBe('inherit');
     expect(t.err.text).toBe('');
   });
 
   it('Ctrl+C stops the run, finishes the file, and reports it cancelled', async () => {
+    scriptSpawn(() => runsUntilQuit('ctrl-c.mp4'));
     const t = io();
     onText(t.err, /ctrl-c\.mp4 \[\s*\d+%\]/, () => process.emit('SIGINT'));
-    const code = await main(['-y', '-re', ...SOURCE, '-t', '30', '-c:v', 'mpeg4', 'ctrl-c.mp4'], t);
+    const code = await main(['-y', ...INPUT, '-c:v', 'mpeg4', 'ctrl-c.mp4'], t);
     expect(t.err.text).toContain('■ cancelled');
     expect(t.err.text).not.toContain('✖ ffmpeg failed');
     expect(code).toBe(0);
-    expect(await probeDuration(ffprobeOf(), join(work, 'ctrl-c.mp4'))).toBeGreaterThan(0);
-  }, 30_000);
+  });
 
   it('refuses to overwrite without a terminal and says why', async () => {
-    writeFileSync(join(work, 'taken.mp4'), '');
+    scriptSpawn(() => fromFixture('exists-no-overwrite'));
     const t = io();
-    const code = await main([...SOURCE, '-t', '1', 'taken.mp4'], t);
+    const code = await main([...INPUT, 'existing.mp4'], t);
     expect(code).not.toBe(0);
-    expect(t.err.text).toContain("File 'taken.mp4' already exists. Exiting.");
+    expect(spawnCalls[0]?.args).toContain('-n');
+    expect(t.err.text).toContain("File 'existing.mp4' already exists. Exiting.");
   });
 });
 
-describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
-  const src = join(work, 'batch');
-  mkdirSync(src, { recursive: true });
-  for (const name of ['take1', 'take2', 'take10']) {
-    spawnSync(ffmpegPath!, [
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-f',
-      'lavfi',
-      '-i',
-      'testsrc=duration=0.5:size=160x120:rate=25',
-      '-c:v',
-      'mpeg4',
-      join(src, `${name}.mp4`),
-    ]);
+describe('main batch', () => {
+  mkdirSync(join(work, 'batch'), { recursive: true });
+  for (const name of ['take1', 'take2', 'take10', 'broken']) {
+    writeFileSync(join(work, 'batch', `${name}.mp4`), '');
   }
-  writeFileSync(join(src, 'broken.mp4'), 'not a video');
+
+  /** Each file converts, except broken.mp4, which ffmpeg can't open. */
+  const converts = (call: SpawnCall) =>
+    call.args.some((a) => a.includes('broken'))
+      ? fromFixture('missing-input')
+      : fromFixture('success', { output: outputOf(call) });
 
   it('converts each file, keeps going after a failure, and summarizes', async () => {
+    scriptSpawn(converts);
     const t = io();
     const file = options('batch.json', { inputs: ['batch/*.mp4'] });
     const code = await main(
@@ -210,11 +197,14 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
       t,
     );
     expect(code).not.toBe(0);
-    for (const name of ['take1', 'take2', 'take10']) {
-      expect(existsSync(join(src, `${name}-out.mkv`))).toBe(true);
-    }
-    const err = t.err.text.replace(/\\/g, '/');
     // Natural order: broken, take1, take2, take10.
+    expect(outputs()).toEqual([
+      'batch/broken-out.mkv',
+      'batch/take1-out.mkv',
+      'batch/take2-out.mkv',
+      'batch/take10-out.mkv',
+    ]);
+    const err = t.err.text.replace(/\\/g, '/');
     expect(err).toMatch(
       /\[1\/4\] batch\/broken\.mp4[\s\S]*\[2\/4\] batch\/take1\.mp4[\s\S]*\[4\/4\] batch\/take10\.mp4/,
     );
@@ -223,6 +213,7 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
   });
 
   it('tags JSON events with the job and ends with a summary', async () => {
+    scriptSpawn(converts);
     const t = io();
     const file = options('batch-json.json', { format: 'json', inputs: ['batch/take*.mp4'] });
     const code = await main(
@@ -241,6 +232,7 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
   });
 
   it('format raw runs every file through ffmpeg, keeps going, and returns the first failure', async () => {
+    scriptSpawn((call) => ({ exitCode: call.args.some((a) => a.includes('broken')) ? 3 : 0 }));
     const t = io();
     const file = options('batch-raw.json', {
       format: 'raw',
@@ -261,12 +253,13 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
       t,
     );
     // broken.mp4 is first and fails; take1 succeeds and must not replace that code.
-    expect(code).not.toBe(0);
-    expect(existsSync(join(src, 'take1-raw.mkv'))).toBe(true);
+    expect(code).toBe(3);
+    expect(outputs()).toEqual(['batch/broken-raw.mkv', 'batch/take1-raw.mkv']);
     expect(t.err.text).toBe('');
   });
 
   it('writes each file log to the logFile template', async () => {
+    scriptSpawn(converts);
     const t = io();
     mkdirSync(join(work, 'logs'), { recursive: true });
     const file = options('batch-log.json', {
@@ -285,6 +278,7 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
   });
 
   it('format quiet prints nothing when every file succeeds', async () => {
+    scriptSpawn(converts);
     const t = io();
     const file = options('batch-quiet.json', {
       format: 'quiet',
@@ -300,6 +294,7 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
   });
 
   it('format quiet skips file labels but still ends with the summary when a file fails', async () => {
+    scriptSpawn(converts);
     const t = io();
     const file = options('batch-quiet-fail.json', {
       format: 'quiet',
@@ -315,37 +310,29 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
   });
 
   it('Ctrl+C cancels the running file and skips the rest of the batch', async () => {
+    scriptSpawn((call) => runsUntilQuit(outputOf(call)));
     const t = io();
-    const long = join(work, 'long');
-    mkdirSync(long, { recursive: true });
-    for (const name of ['long1', 'long2']) {
-      spawnSync(ffmpegPath!, [
-        '-y',
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        'lavfi',
-        '-i',
-        'testsrc=duration=20:size=160x120:rate=25',
-        '-c:v',
-        'mpeg4',
-        join(long, `${name}.mp4`),
-      ]);
-    }
-    const file = options('batch-sigint.json', { inputs: ['long/*.mp4'] });
+    const file = options('batch-sigint.json', { inputs: ['batch/take1.mp4', 'batch/take2.mp4'] });
     onText(t.err, /\[\s*\d+%\]/, () => process.emit('SIGINT'));
-    const code = await main(
-      ['--treg-option', file, '-re', '-i', '{input}', '-c:v', 'mpeg4', '{dir}/{name}-cut.mkv'],
-      t,
-    );
+    const code = await main(['--treg-option', file, '-c:v', 'mpeg4', '{dir}/{name}-cut.mkv'], t);
     expect(code).toBe(0);
     expect(t.err.text).toContain('batch: 2 files, 0 done, 1 cancelled, 1 skipped');
-    expect(existsSync(join(long, 'long1-cut.mkv'))).toBe(true);
-    expect(existsSync(join(long, 'long2-cut.mkv'))).toBe(false);
-  }, 60_000);
+    expect(outputs()).toEqual(['batch/take1-cut.mkv']);
+  });
+
+  it('skips the rest of the batch when ffmpeg alone reports a received signal', async () => {
+    scriptSpawn(() => ({ stderr: '[info] Exiting normally, received signal 2.\n', exitCode: 255 }));
+    const t = io();
+    const file = options('batch-signal.json', { inputs: ['batch/take1.mp4', 'batch/take2.mp4'] });
+    const code = await main(['--treg-option', file, '-c:v', 'mpeg4', '{dir}/{name}-signal.mkv'], t);
+    // A batch returns the cancelled file's own exit code.
+    expect(code).toBe(255);
+    expect(t.err.text).toContain('batch: 2 files, 0 done, 1 cancelled, 1 skipped');
+    expect(outputs()).toEqual(['batch/take1-signal.mkv']);
+  });
 
   it('Ctrl+C between files starts no further file', async () => {
+    scriptSpawn(converts);
     const t = io();
     const file = options('batch-between.json', {
       inputs: ['batch/take1.mp4', 'batch/take2.mp4'],
@@ -358,8 +345,7 @@ describe.skipIf(!ffmpegPath)('main batch (real ffmpeg)', () => {
     );
     expect(code).toBe(0);
     expect(t.err.text).toContain('batch: 2 files, 1 done, 1 skipped');
-    expect(existsSync(join(src, 'take1-between.mkv'))).toBe(true);
-    expect(existsSync(join(src, 'take2-between.mkv'))).toBe(false);
+    expect(outputs()).toEqual(['batch/take1-between.mkv']);
   });
 
   it('refuses -i on the command line while inputs is set', async () => {

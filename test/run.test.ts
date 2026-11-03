@@ -1,18 +1,24 @@
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { existsSync, rmSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { findExecutable, locateFfprobe } from '../src/ffmpeg/locate.js';
 import { probeDuration } from '../src/ffmpeg/probe.js';
 import { runFfmpeg, type ProgressSnapshot, type RunOptions } from '../src/ffmpeg/run.js';
 import type { LogEntry } from '../src/types.js';
+import {
+  asksToOverwrite,
+  fakeBin,
+  ffmpegCalls,
+  fromFixture,
+  isFfprobe,
+  runsUntilQuit,
+  scriptSpawn,
+  spawnCalls,
+} from './fake-spawn.js';
 
-const ffmpegPath = findExecutable(process.env.FFMPEG_PATH ?? 'ffmpeg');
-const work = mkdtempSync(join(tmpdir(), 'treg-run-'));
-const SOURCE = ['-f', 'lavfi', '-i', 'testsrc=size=160x120:rate=25'];
+const bin = fakeBin();
+const INPUT = ['-i', 'input.mp4'];
 
 function run(args: string[], extra: Partial<RunOptions> = {}) {
-  const job = runFfmpeg({ ffmpegPath: ffmpegPath!, args, cwd: work, interactive: false, ...extra });
+  const job = runFfmpeg({ ffmpegPath: bin.ffmpeg, args, interactive: false, ...extra });
   const progress: ProgressSnapshot[] = [];
   const logs: LogEntry[] = [];
   job.on('progress', (p) => progress.push(p));
@@ -20,11 +26,10 @@ function run(args: string[], extra: Partial<RunOptions> = {}) {
   return { job, progress, logs };
 }
 
-const ffprobeOf = () => locateFfprobe(ffmpegPath!) ?? 'ffprobe';
-
-describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
+describe('runFfmpeg', () => {
   it('reports progress with percent against -t and exits 0', async () => {
-    const { job, progress } = run(['-y', ...SOURCE, '-t', '2', '-c:v', 'mpeg4', 'ok.mp4']);
+    scriptSpawn(() => fromFixture('success'));
+    const { job, progress } = run(['-y', ...INPUT, '-t', '4', '-c:v', 'mpeg4', 'out.mp4']);
     let started = false;
     job.on('start', (s) => {
       started = true;
@@ -37,13 +42,15 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
     expect(result.failure).toBeUndefined();
     const last = progress.at(-1)!;
     expect(last.done).toBe(true);
-    expect(last.totalSec).toBe(2);
+    // -t wins over the 5 s duration in the recorded header.
+    expect(last.totalSec).toBe(4);
     expect(last.percent).toBeGreaterThan(95);
-    expect(result.header.outputs[0]?.path).toBe('ok.mp4');
+    expect(result.header.outputs[0]?.path).toBe('out.mp4');
   });
 
   it("surfaces ffmpeg's own error for a codec/container mismatch", async () => {
-    const { job } = run(['-y', ...SOURCE, '-t', '1', '-c:v', 'mjpeg', 'bad.webm']);
+    scriptSpawn(() => fromFixture('codec-mismatch'));
+    const { job } = run(['-y', ...INPUT, '-c:v', 'mjpeg', 'out.webm']);
     const result = await job.done;
     expect(result.exitCode).not.toBe(0);
     expect(result.failure?.errors).toContainEqual(
@@ -57,9 +64,9 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
   });
 
   it('answers the overwrite prompt through onPrompt', async () => {
-    writeFileSync(join(work, 'exists.mp4'), '');
+    scriptSpawn(() => asksToOverwrite());
     const prompts: string[] = [];
-    const no = run([...SOURCE, '-t', '1', 'exists.mp4'], {
+    const no = run([...INPUT, 'existing.mp4'], {
       interactive: true,
       onPrompt: (p) => {
         prompts.push(p.file);
@@ -67,11 +74,11 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
       },
     });
     const refused = await no.job.done;
-    expect(prompts).toEqual(['exists.mp4']);
+    expect(prompts).toEqual(['existing.mp4']);
     expect(refused.exitCode).not.toBe(0);
     expect(refused.failure?.errors[0]?.message).toContain('Not overwriting');
 
-    const yes = run([...SOURCE, '-t', '1', '-c:v', 'mpeg4', 'exists.mp4'], {
+    const yes = run([...INPUT, '-c:v', 'mpeg4', 'existing.mp4'], {
       interactive: true,
       onPrompt: () => true,
     });
@@ -79,36 +86,42 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
   });
 
   it('adds -n when not interactive, so an existing output fails clearly', async () => {
-    writeFileSync(join(work, 'exists2.mp4'), '');
-    const { job } = run([...SOURCE, '-t', '1', 'exists2.mp4']);
+    scriptSpawn(() => fromFixture('exists-no-overwrite'));
+    const { job } = run([...INPUT, 'existing.mp4']);
     const result = await job.done;
+    expect(spawnCalls[0]?.args).toContain('-n');
     expect(result.failure?.errors[0]?.message).toContain('already exists');
   });
 
   it('cancels gracefully on the first cancel()', async () => {
-    const { job } = run(['-y', '-re', ...SOURCE, '-t', '30', '-c:v', 'mpeg4', 'long.mp4']);
+    scriptSpawn(() => runsUntilQuit('long.mp4'));
+    const { job } = run(['-y', ...INPUT, '-c:v', 'mpeg4', 'long.mp4']);
     job.once('progress', () => job.cancel());
     const result = await job.done;
     expect(result.cancelled).toBe(true);
     expect(result.failure).toBeUndefined();
-    expect(result.elapsedSec).toBeLessThan(15);
-    expect(await probeDuration(ffprobeOf(), join(work, 'long.mp4'))).toBeGreaterThan(0);
+    // Only `q` ends this script, so a clean exit means treg asked ffmpeg to finish.
+    expect(result.ffmpegExitCode).toBe(0);
+    expect(result.signal).toBeUndefined();
+  });
+
+  it('reads the duration from ffprobe', async () => {
+    scriptSpawn(() => ({ stdout: '5.000000\n' }));
+    expect(await probeDuration(bin.ffprobe, 'input.mp4')).toBe(5);
+    expect(spawnCalls[0]?.args.at(-1)).toBe('input.mp4');
   });
 
   it('stops a pending probe when its signal aborts', async () => {
-    const file = join(work, 'probe-me.mp4');
-    await run(['-y', ...SOURCE, '-t', '1', '-c:v', 'mpeg4', 'probe-me.mp4']).job.done;
-    expect(await probeDuration(ffprobeOf(), file)).toBeGreaterThan(0);
+    scriptSpawn(() => ({ hang: true }));
     const abort = new AbortController();
-    const pending = probeDuration(ffprobeOf(), file, abort.signal);
+    const pending = probeDuration(bin.ffprobe, 'input.mp4', abort.signal);
     abort.abort();
     expect(await pending).toBeUndefined();
   });
 
   it('cancel() during the probe stops it and never starts ffmpeg', async () => {
-    const { job } = run(['-y', ...SOURCE, '-t', '2', '-c:v', 'mpeg4', 'never-started.mp4'], {
-      probe: true,
-    });
+    scriptSpawn(() => ({ hang: true }));
+    const { job } = run(['-y', ...INPUT, '-c:v', 'mpeg4', 'never-started.mp4'], { probe: true });
     let started = false;
     job.on('start', () => (started = true));
     // run() has spawned ffprobe by the time this macrotask runs.
@@ -118,11 +131,12 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
     expect(result.cancelled).toBe(true);
     expect(result.exitCode).toBe(0);
     expect(result.failure).toBeUndefined();
-    expect(existsSync(join(work, 'never-started.mp4'))).toBe(false);
+    expect(spawnCalls.map(isFfprobe)).toEqual([true]);
   });
 
   it('cancel() before the run begins never starts ffmpeg', async () => {
-    const { job } = run(['-y', ...SOURCE, '-t', '2', '-c:v', 'mpeg4', 'never-begun.mp4']);
+    scriptSpawn(() => fromFixture('success'));
+    const { job } = run(['-y', ...INPUT, '-c:v', 'mpeg4', 'never-begun.mp4']);
     let started = false;
     job.on('start', () => (started = true));
     job.cancel();
@@ -130,56 +144,68 @@ describe.skipIf(!ffmpegPath)('runFfmpeg (real ffmpeg)', () => {
     expect(started).toBe(false);
     expect(result.cancelled).toBe(true);
     expect(result.exitCode).toBe(0);
-    expect(existsSync(join(work, 'never-begun.mp4'))).toBe(false);
+    expect(spawnCalls).toEqual([]);
   });
 
   it('kills ffmpeg on a second cancel()', async () => {
-    const { job } = run(['-y', '-re', ...SOURCE, '-t', '30', '-c:v', 'mpeg4', 'stop-kill.mp4']);
+    scriptSpawn(() => ({ ...runsUntilQuit('stop-kill.mp4'), onStdin: () => undefined }));
+    const { job } = run(['-y', ...INPUT, '-c:v', 'mpeg4', 'stop-kill.mp4']);
     job.once('progress', () => {
       job.cancel();
       job.cancel();
     });
     const result = await job.done;
     expect(result.cancelled).toBe(true);
-    expect(result.elapsedSec).toBeLessThan(15);
+    expect(result.signal).toBe('SIGTERM');
     expect(result.ffmpegExitCode).toBe(255);
   });
 
   it('takes percent from the frame limit when no duration is known', async () => {
-    const { job, progress } = run(
-      ['-y', ...SOURCE, '-frames:v', '50', '-c:v', 'mpeg4', 'frames.mp4'],
-      { probe: true },
+    scriptSpawn((call) =>
+      isFfprobe(call)
+        ? { exitCode: 1 }
+        : { stdout: 'frame=25\nprogress=continue\nframe=50\nprogress=end\n' },
     );
+    const { job, progress } = run(['-y', ...INPUT, '-frames:v', '50', '-c:v', 'mpeg4', 'out.mp4'], {
+      probe: true,
+    });
     const result = await job.done;
     expect(result.exitCode).toBe(0);
+    expect(ffmpegCalls()).toHaveLength(1);
     const last = progress.at(-1)!;
     expect(last.totalSec).toBeUndefined();
     expect(last.percent).toBe(100);
   });
 
   it('keeps an auto log file only on failure', async () => {
-    const ok = await run(['-y', ...SOURCE, '-t', '1', '-c:v', 'mpeg4', 'log-ok.mp4'], {
-      logFile: 'auto',
-    }).job.done;
+    scriptSpawn(() => fromFixture('success'));
+    const ok = await run(['-y', ...INPUT, '-c:v', 'mpeg4', 'out.mp4'], { logFile: 'auto' }).job
+      .done;
     expect(ok.logFile).toBeUndefined();
 
-    const bad = await run(['-y', ...SOURCE, '-t', '1', '-c:v', 'libnope', 'log-bad.mp4'], {
-      logFile: 'auto',
-    }).job.done;
+    scriptSpawn(() => fromFixture('unknown-encoder'));
+    const bad = await run(['-y', ...INPUT, '-c:v', 'libnope', 'out.mp4'], { logFile: 'auto' }).job
+      .done;
     expect(bad.logFile).toBeDefined();
     expect(existsSync(bad.logFile!)).toBe(true);
     expect(bad.failure?.logFile).toBe(bad.logFile);
+    rmSync(bad.logFile!, { force: true });
   });
 
   it('falls back to stats parsing when media goes to stdout', async () => {
-    const { job, progress } = run(['-y', ...SOURCE, '-t', '1', '-f', 'null', '-']);
+    scriptSpawn(() => fromFixture('legacy-stats'));
+    const { job, progress } = run(['-y', ...INPUT, '-f', 'null', '-']);
+    let mode: string | undefined;
+    job.on('start', (s) => (mode = s.mode));
     const result = await job.done;
+    expect(mode).toBe('stats');
     expect(result.exitCode).toBe(0);
     expect(progress.length).toBeGreaterThan(0);
   });
 
   it('rejects when the binary cannot start', async () => {
-    const job = runFfmpeg({ ffmpegPath: join(work, 'missing-ffmpeg'), args: ['-version'] });
+    scriptSpawn(() => ({ startError: 'ENOENT' }));
+    const job = runFfmpeg({ ffmpegPath: 'missing-ffmpeg', args: ['-version'] });
     await expect(job.done).rejects.toThrow(/could not start ffmpeg/);
   });
 });
