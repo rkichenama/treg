@@ -67,6 +67,15 @@ the last 10 lines it printed instead.
 
 Requirements: Node 22.17 or newer, and `ffmpeg` on your `PATH` (or set `ffmpegPath`).
 
+> [!WARNING]
+> Changes to ffmpeg may break treg. treg reads ffmpeg's log text and `-progress` output, and ffmpeg
+> doesn't guarantee that either stays the same between versions. If progress or error messages look
+> wrong, check your version first.
+>
+> treg is built against `ffmpeg version 2023-06-11-git-09621fd7d9-full_build-www.gyan.dev`: its
+> tests replay output recorded from that build. The full test suite also last ran against a live
+> ffmpeg 9.0.2 on Windows. Tests don't run a live ffmpeg now, so other versions aren't checked.
+
 treg isn't on npm. Install the prebuilt package from a
 [GitHub release](https://github.com/rkichenama/treg/releases):
 
@@ -209,6 +218,8 @@ batch: 3 files, 2 done, 1 failed
 - Each entry is a file path or a glob: `*`, `?`, `**`, `[abc]` or `{mov,mp4}`.
 - Paths are absolute, or relative to the current directory.
 - An entry that names an existing file is used as-is, so `[site] clip (2160p).mp4` works without escaping.
+- JSON needs every literal backslash doubled: write `clips\\a.mp4` for `clips\a.mp4`. Windows also accepts `clips/a.mp4`. See [`examples/treg.inputs.windows.json`](examples/treg.inputs.windows.json) and [`examples/treg.inputs.mac.json`](examples/treg.inputs.mac.json).
+- A missing file with `[` or `]` in its name is read as a glob, so its error is `pattern matched no files`.
 - A plain path must exist, and a glob must match at least one file. treg lists every problem before running anything.
 - A glob's matches are sorted naturally (`take2` before `take10`). Directories and duplicates are skipped.
 
@@ -278,8 +289,9 @@ pnpm dev -i in.mp4 out.mkv      # run from source
 pnpm fixtures   # re-record ffmpeg output used by the tests
 ```
 
-Tests run against real ffmpeg output recorded in `test/fixtures/`. The integration tests also run
-the ffmpeg on your `PATH` and are skipped when it isn't installed.
+Tests don't need ffmpeg installed. They mock `spawn` and replay real ffmpeg output recorded in
+`test/fixtures/`. When you re-record them with `pnpm fixtures`, update the ffmpeg version in
+[Install](#install) to match.
 
 ## License
 
