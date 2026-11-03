@@ -33,6 +33,16 @@ export function effectiveExitCode(ffmpegExitCode: number, collector: LogCollecto
   return ffmpegExitCode === 0 && collector.hasFatal() ? 1 : ffmpegExitCode;
 }
 
+/** ffmpeg 9 logs these as its threads stop. They repeat the failure, not explain it. */
+const THREAD_SHUTDOWN =
+  /^(Error sending frames to consumers:|Task finished with error code:|Terminating thread with return code )/;
+
+/** Drops thread shutdown lines, unless they're all ffmpeg said. */
+function withoutShutdownLines(errors: readonly Issue[]): readonly Issue[] {
+  const kept = errors.filter((e) => !THREAD_SHUTDOWN.test(e.message));
+  return kept.length > 0 ? kept : errors;
+}
+
 export function buildFailureReport(input: {
   exitCode: number;
   ffmpegExitCode?: number;
@@ -45,7 +55,7 @@ export function buildFailureReport(input: {
   const report: FailureReport = {
     exitCode: input.exitCode,
     ffmpegExitCode: input.ffmpegExitCode ?? input.exitCode,
-    errors: collector.errors.map((e) => ({ ...e })),
+    errors: withoutShutdownLines(collector.errors).map((e) => ({ ...e })),
     warnings: collector.warnings.map((w) => ({ ...w })),
     mapping: [...input.header.mapping],
     fallbackLines: collector.errors.length === 0 ? collector.recentLines() : [],

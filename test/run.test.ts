@@ -71,6 +71,34 @@ describe('runFfmpeg', () => {
     expect(result.failure?.exitCode).toBe(-22);
   });
 
+  describe('failure report', () => {
+    const SHUTDOWN = [
+      '[af#0:1 @ 0x1] [error] Error sending frames to consumers: Invalid argument',
+      '[af#0:1 @ 0x1] [error] Task finished with error code: -22 (Invalid argument)',
+      '[af#0:1 @ 0x1] [error] Terminating thread with return code -22 (Invalid argument)',
+    ];
+    const messages = (result: { failure?: { errors: { message: string }[] } }) =>
+      result.failure?.errors.map((e) => e.message);
+
+    it("leaves out ffmpeg's thread shutdown lines, and logs still carry them", async () => {
+      scriptSpawn(() => ({
+        stderr: ['[webm @ 0x1] [error] The real reason', ...SHUTDOWN].join('\n') + '\n',
+        exitCode: 1,
+      }));
+      const { job, logs } = run([...INPUT, 'out.webm']);
+      const result = await job.done;
+      expect(messages(result)).toEqual(['The real reason']);
+      expect(result.errorCount).toBe(4);
+      expect(logs.map((l) => l.message)).toContainEqual(expect.stringContaining('Terminating'));
+    });
+
+    it('keeps the shutdown lines when ffmpeg logged nothing else', async () => {
+      scriptSpawn(() => ({ stderr: SHUTDOWN.join('\n') + '\n', exitCode: 1 }));
+      const result = await run([...INPUT, 'out.webm']).job.done;
+      expect(messages(result)).toHaveLength(3);
+    });
+  });
+
   it('answers the overwrite prompt through onPrompt', async () => {
     scriptSpawn(() => asksToOverwrite());
     const prompts: string[] = [];
