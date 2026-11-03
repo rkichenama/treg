@@ -85,14 +85,10 @@ treg isn't on npm. Install the prebuilt package from a
 [GitHub release](https://github.com/rkichenama/treg/releases):
 
 ```sh
-pnpm add -g https://github.com/rkichenama/treg/releases/download/v0.1.3/treg-0.1.3.tgz
+pnpm add -g https://github.com/rkichenama/treg/releases/download/v0.1.4/treg-0.1.4.tgz
 # or
-npm install -g https://github.com/rkichenama/treg/releases/download/v0.1.3/treg-0.1.3.tgz
+npm install -g https://github.com/rkichenama/treg/releases/download/v0.1.4/treg-0.1.4.tgz
 ```
-
-This page describes the `main` branch. Release 0.1.3 differs in how it reports ffmpeg 9 failures:
-it prints negative exit codes as large numbers on Windows (`exit 4294967274` for -22), and it
-includes the lines ffmpeg logs as its threads stop.
 
 The release file is already built, so installing runs no scripts. treg has no runtime
 dependencies. (Installing straight from the repository with `pnpm add -g github:rkichenama/treg`
@@ -102,7 +98,7 @@ To build from source instead:
 
 ```sh
 git clone https://github.com/rkichenama/treg && cd treg
-pnpm install && pnpm pack && pnpm add -g ./treg-0.1.3.tgz
+pnpm install && pnpm pack && pnpm add -g ./treg-0.1.4.tgz
 ```
 
 ### PowerShell
