@@ -1,0 +1,9 @@
+{
+  "inputs": [
+    "/Users/me/Movies/[site.com] absolute (2160p).mp4",
+    "clips/[site.com] relative (2160p).mp4",
+    "./clips/[site.com] current folder (2160p).mp4",
+    "../[site.com] parent folder (2160p).mp4",
+    "clips/[site.com] back\\slash.mp4"
+  ]
+}

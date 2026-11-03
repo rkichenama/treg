@@ -1,0 +1,10 @@
+{
+  "inputs": [
+    "C:\\Users\\me\\Videos\\[site.com] absolute (2160p).mp4",
+    "C:/Users/me/Videos/[site.com] absolute forward slashes (2160p).mp4",
+    "clips\\[site.com] relative (2160p).mp4",
+    "clips/[site.com] relative forward slashes (2160p).mp4",
+    ".\\clips\\[site.com] current folder (2160p).mp4",
+    "..\\[site.com] parent folder (2160p).mp4"
+  ]
+}
