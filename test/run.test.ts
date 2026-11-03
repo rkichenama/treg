@@ -63,6 +63,14 @@ describe('runFfmpeg', () => {
     expect(result.failure?.fallbackLines).toEqual([]);
   });
 
+  it('reports a negative exit code as signed when Windows returns it unsigned', async () => {
+    scriptSpawn(() => ({ stderr: '[fatal] It broke\n', exitCode: 4294967274 }));
+    const result = await run([...INPUT, 'out.mp4']).job.done;
+    expect(result.exitCode).toBe(-22);
+    expect(result.ffmpegExitCode).toBe(-22);
+    expect(result.failure?.exitCode).toBe(-22);
+  });
+
   it('answers the overwrite prompt through onPrompt', async () => {
     scriptSpawn(() => asksToOverwrite());
     const prompts: string[] = [];

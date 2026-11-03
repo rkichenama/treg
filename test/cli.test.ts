@@ -116,6 +116,19 @@ describe('main', () => {
     expect(t.err.text).not.toContain('Press [q]');
   });
 
+  it('prints and returns a negative exit code as signed', async () => {
+    scriptSpawn(() => ({ stderr: '[fatal] It broke\n', exitCode: 4294967274 }));
+    const t = io();
+    expect(await main([...INPUT, 'out.mp4'], t)).toBe(-22);
+    expect(t.err.text).toContain('✖ ffmpeg failed (exit -22)');
+  });
+
+  it('returns a signed exit code from format raw', async () => {
+    scriptSpawn(() => ({ exitCode: 4294967274 }));
+    const file = options('raw-signed.json', { format: 'raw' });
+    expect(await main(['--treg-option', file, ...INPUT, 'out.mp4'], io())).toBe(-22);
+  });
+
   it('prints line progress and a summary when not on a terminal', async () => {
     scriptSpawn(() => fromFixture('success', { output: 'line.mp4' }));
     const t = io();

@@ -19,6 +19,11 @@ export interface FailureReport {
   logFile?: string;
 }
 
+/** ffmpeg can exit with a negative code, which Windows reports as unsigned 32-bit. */
+export function signedExitCode(code: number): number {
+  return code > 0x7fffffff ? code - 0x100000000 : code;
+}
+
 /**
  * ffmpeg 6.1 to 9.0 exit with 0 after some fatal errors, e.g. when refusing
  * to overwrite an existing output (`-n`, or answering no to the prompt).

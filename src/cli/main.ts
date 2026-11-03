@@ -8,6 +8,7 @@ import { TregError } from '../errors.js';
 import { analyzeArgs } from '../ffmpeg/analyze.js';
 import { locateFfmpeg } from '../ffmpeg/locate.js';
 import { runFfmpeg, type FfmpegRun, type PromptInfo, type RunResult } from '../ffmpeg/run.js';
+import { signedExitCode } from '../report/failure.js';
 import { formatBatchSummary, formatJobLabel } from '../report/format.js';
 import {
   createRenderer,
@@ -256,7 +257,7 @@ function passthrough(ffmpegPath: string, args: readonly string[], io: CliIO): Pr
     });
     child.on('close', (code, signal) => {
       process.off('SIGINT', ignore);
-      resolvePromise(code ?? (signal ? 255 : 1));
+      resolvePromise(signedExitCode(code ?? (signal ? 255 : 1)));
     });
   });
 }

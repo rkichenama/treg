@@ -7,7 +7,12 @@ import { TregError } from '../errors.js';
 import { ProgressParser } from '../parse/progress.js';
 import { StderrParser, type StderrEvent } from '../parse/stderr.js';
 import { LogCollector } from '../report/collect.js';
-import { buildFailureReport, effectiveExitCode, type FailureReport } from '../report/failure.js';
+import {
+  buildFailureReport,
+  effectiveExitCode,
+  signedExitCode,
+  type FailureReport,
+} from '../report/failure.js';
 import type { HeaderInfo, LogEntry, ProgressUpdate } from '../types.js';
 import {
   analyzeArgs,
@@ -240,7 +245,7 @@ export class FfmpegRun extends EventEmitter<RunEvents> {
     sendHeader();
     if (logStream && !logStream.closed) await once(logStream, 'close');
 
-    const ffmpegExitCode = code ?? (signal ? 255 : 1);
+    const ffmpegExitCode = signedExitCode(code ?? (signal ? 255 : 1));
     const exitCode = effectiveExitCode(ffmpegExitCode, collector);
     const failed = exitCode !== 0 && !this.cancelled;
     let keptLog = logPath;
